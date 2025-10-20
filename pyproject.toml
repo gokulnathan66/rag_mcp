@@ -1,0 +1,11 @@
+[tool.poetry]
+name = "rag-mcp-server"
+version = "0.1.0"
+description = "RAG MCP Server scaffold"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
