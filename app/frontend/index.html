@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG MCP Server - CSV Upload & Query</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 RAG MCP Server</h1>
+            <p class="subtitle">Upload CSV files and query documents with natural language</p>
+            <div id="healthStatus" class="health-status"></div>
+        </header>
+
+        <div class="main-content">
+            <!-- Upload Section -->
+            <section class="card">
+                <h2>📤 Upload CSV File</h2>
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="csvFile">Select CSV File:</label>
+                        <input type="file" id="csvFile" accept=".csv" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span id="uploadBtnText">Upload & Index</span>
+                        <span id="uploadSpinner" class="spinner" style="display: none;"></span>
+                    </button>
+                </form>
+                <div id="uploadResult" class="result"></div>
+            </section>
+
+            <!-- Query Section -->
+            <section class="card">
+                <h2>🔎 Query Documents</h2>
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="queryInput">Enter your question:</label>
+                        <input 
+                            type="text" 
+                            id="queryInput" 
+                            placeholder="e.g., What are the main topics in the documents?"
+                            required
+                        >
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="maxResults">Max Results:</label>
+                            <input 
+                                type="number" 
+                                id="maxResults" 
+                                value="10" 
+                                min="1" 
+                                max="100"
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="scoreThreshold">Min Score (optional):</label>
+                            <input 
+                                type="number" 
+                                id="scoreThreshold" 
+                                placeholder="0.0 - 1.0"
+                                step="0.01"
+                                min="0"
+                                max="1"
+                            >
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span id="queryBtnText">Search</span>
+                        <span id="querySpinner" class="spinner" style="display: none;"></span>
+                    </button>
+                </form>
+                <div id="queryResults" class="results-container"></div>
+            </section>
+
+            <!-- Uploaded Files Section -->
+            <section class="card">
+                <h2>📁 Uploaded Files</h2>
+                <button id="refreshFilesBtn" class="btn btn-secondary">Refresh List</button>
+                <div id="filesList" class="files-list"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
