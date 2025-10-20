@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
+import logfire
+
 from .models import CSVDocument
 from .config import ServerConfig
 from .errors import FileAccessError, CSVParsingError
@@ -65,11 +67,12 @@ class CSVParser:
             FileAccessError: If file cannot be accessed or read
             CSVParsingError: If CSV parsing fails
         """
-        delimiter = delimiter or self.delimiter
-        encoding = encoding or self.encoding
-        
-        # Validate file path
-        path = Path(file_path)
+        with logfire.span("csv_parser.read_csv_file", file_path=file_path, encoding=encoding):
+            delimiter = delimiter or self.delimiter
+            encoding = encoding or self.encoding
+            
+            # Validate file path
+            path = Path(file_path)
         
         # Check if file exists
         if not path.exists():
@@ -95,11 +98,13 @@ class CSVParser:
                     rows.append(dict(row))
                 
                 logger.info(f"Successfully read {len(rows)} rows from {file_path}")
+                logfire.info("CSV file read successfully", rows_count=len(rows), file_path=file_path)
                 return rows
                 
         except PermissionError as e:
             error_msg = f"Permission denied reading file: {file_path}"
             logger.error(f"{error_msg} - {str(e)}")
+            logfire.error("CSV file permission denied", file_path=file_path, error=str(e))
             raise FileAccessError(error_msg, file_path=file_path, original_error=str(e))
             
         except UnicodeDecodeError as e:
@@ -172,8 +177,9 @@ class CSVParser:
             FileAccessError: If file cannot be accessed
             CSVParsingError: If CSV parsing fails
         """
-        # Read CSV rows
-        rows = self.read_csv_file(file_path, delimiter, encoding)
+        with logfire.span("csv_parser.parse_csv_to_documents", file_path=file_path):
+            # Read CSV rows
+            rows = self.read_csv_file(file_path, delimiter, encoding)
         
         # Parse rows into CSVDocument objects
         documents = []
@@ -213,12 +219,18 @@ class CSVParser:
                 # Continue processing other rows
                 continue
         
-        logger.info(
-            f"Successfully parsed {len(documents)} documents from {file_path} "
-            f"({len(rows) - len(documents)} rows skipped due to errors)"
-        )
-        
-        return documents
+            logger.info(
+                f"Successfully parsed {len(documents)} documents from {file_path} "
+                f"({len(rows) - len(documents)} rows skipped due to errors)"
+            )
+            logfire.info(
+                "CSV documents parsed",
+                documents_count=len(documents),
+                rows_skipped=len(rows) - len(documents),
+                file_path=file_path
+            )
+            
+            return documents
     
     def _generate_document_id(
         self,

@@ -1,13 +1,20 @@
 import asyncio
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import logfire
 from fastmcp import FastMCP
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .config import ServerConfig
 from .models import QueryResult, ErrorResponse, ServerStatus, IngestionStatus
+from .orchestrator import Orchestrator
+
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 # Configure Pydantic Logfire for monitoring and debugging
@@ -21,109 +28,351 @@ def setup_logfire(config: ServerConfig) -> None:
             )
             # Set up logging level
             logging.basicConfig(level=getattr(logging, config.log_level.upper()))
-            logger = logging.getLogger(__name__)
             logger.info(f"Logfire configured for {config.mcp_server_name} v{config.mcp_version}")
         except Exception as e:
             # Fallback to basic logging if logfire setup fails
             logging.basicConfig(level=getattr(logging, config.log_level.upper()))
-            logger = logging.getLogger(__name__)
             logger.warning(f"Logfire setup failed, using basic logging: {e}")
     else:
         # Set up basic logging when logfire is disabled
         logging.basicConfig(level=getattr(logging, config.log_level.upper()))
 
 
-# MCP Tool Input/Output Models
+# MCP Tool Input Models
+class IngestCSVInput(BaseModel):
+    """Input model for ingest_csv MCP tool."""
+    file_path: str = Field(..., description="Path to the CSV file to ingest")
+
+
 class QueryDocumentsInput(BaseModel):
-    query: str
-    max_results: int = 10
+    """Input model for query_documents MCP tool."""
+    query: str = Field(..., description="Natural language query to search for relevant documents")
+    max_results: int = Field(default=10, ge=1, le=100, description="Maximum number of results to return")
+    score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Minimum similarity score threshold")
 
 
-class IngestCollectionInput(BaseModel):
-    collection_name: str
-    filters: Optional[Dict[str, Any]] = None
+# Global orchestrator instance
+_orchestrator: Optional[Orchestrator] = None
+_server_start_time: Optional[datetime] = None
 
 
-# Import the models from models.py instead of redefining them
+def get_orchestrator(config: ServerConfig) -> Orchestrator:
+    """Get or create the global orchestrator instance."""
+    global _orchestrator
+    if _orchestrator is None:
+        logger.info("Initializing orchestrator...")
+        _orchestrator = Orchestrator(config)
+        logger.info("Orchestrator initialized successfully")
+    return _orchestrator
 
 
 # Initialize FastMCP server
 def create_mcp_server(config: ServerConfig) -> FastMCP:
-    """Create and configure the FastMCP server with RAG tools."""
+    """
+    Create and configure the FastMCP server with RAG tools.
+    
+    Implements MCP protocol compliance with:
+    - JSON-RPC 2.0 handling (provided by FastMCP)
+    - Server discovery and capability advertisement
+    - Structured error responses
+    - Tool registration and metadata
+    
+    Args:
+        config: Server configuration
+        
+    Returns:
+        Configured FastMCP server instance
+    """
+    global _server_start_time
+    _server_start_time = datetime.now(timezone.utc)
     
     # Set up Logfire monitoring
     setup_logfire(config)
     
-    # Create FastMCP server instance
-    mcp = FastMCP(config.mcp_server_name)
+    # Create FastMCP server instance with metadata for discovery
+    mcp = FastMCP(
+        name=config.mcp_server_name,
+        version=config.mcp_version
+    )
+    
+    logger.info(f"Creating FastMCP server: {config.mcp_server_name} v{config.mcp_version}")
+    
+    # Initialize orchestrator on server startup
+    orchestrator = get_orchestrator(config)
+    
+    @mcp.tool()
+    async def ingest_csv(input_data: IngestCSVInput) -> IngestionStatus:
+        """
+        Ingest documents from a CSV file into the vector database.
+        
+        This tool:
+        1. Parses the CSV file and extracts documents
+        2. Chunks large documents into manageable segments
+        3. Generates embeddings using FastEmbed
+        4. Stores vectors in Qdrant database
+        
+        Args:
+            input_data: Contains file_path to the CSV file
+            
+        Returns:
+            IngestionStatus with processing results and any errors
+            
+        Raises:
+            Exception: If ingestion fails with detailed error information
+        """
+        from .errors import handle_exception, log_error, RAGError
+        
+        correlation_id = str(uuid.uuid4())
+        
+        with logfire.span(
+            "ingest_csv",
+            file_path=input_data.file_path,
+            correlation_id=correlation_id
+        ):
+            try:
+                logger.info(f"[{correlation_id}] Starting CSV ingestion: {input_data.file_path}")
+                
+                # Execute ingestion workflow through orchestrator
+                result = await orchestrator.ingest_csv(input_data.file_path)
+                
+                logger.info(
+                    f"[{correlation_id}] CSV ingestion completed: "
+                    f"status={result.status}, docs={result.documents_processed}, "
+                    f"chunks={result.chunks_created}, embeddings={result.embeddings_generated}"
+                )
+                
+                return result
+                
+            except RAGError as e:
+                # Handle structured RAG errors
+                log_error(e, context={'operation': 'ingest_csv', 'file_path': input_data.file_path})
+                logfire.error(
+                    f"CSV ingestion failed: {e.message}",
+                    correlation_id=e.correlation_id,
+                    error_code=e.code
+                )
+                
+                return IngestionStatus(
+                    status="failed",
+                    collection_name=input_data.file_path,
+                    documents_processed=0,
+                    chunks_created=0,
+                    embeddings_generated=0,
+                    errors=[f"{e.code}: {e.message} (correlation_id: {e.correlation_id})"]
+                )
+                
+            except Exception as e:
+                # Handle unexpected errors
+                error_response = handle_exception(e, "ingest_csv", correlation_id)
+                logfire.error(
+                    f"Unexpected error during CSV ingestion: {str(e)}",
+                    correlation_id=correlation_id
+                )
+                
+                return IngestionStatus(
+                    status="failed",
+                    collection_name=input_data.file_path,
+                    documents_processed=0,
+                    chunks_created=0,
+                    embeddings_generated=0,
+                    errors=[f"{error_response.error_code}: {error_response.error_message} (correlation_id: {correlation_id})"]
+                )
     
     @mcp.tool()
     async def query_documents(input_data: QueryDocumentsInput) -> List[QueryResult]:
-        """Query documents using vector similarity search."""
-        with logfire.span("query_documents", query=input_data.query, max_results=input_data.max_results):
+        """
+        Query documents using natural language and vector similarity search.
+        
+        This tool:
+        1. Converts the query to an embedding vector using FastEmbed
+        2. Performs similarity search in Qdrant vector database
+        3. Returns relevant documents ranked by similarity score
+        
+        Args:
+            input_data: Contains query text, max_results, and optional score_threshold
+            
+        Returns:
+            List of QueryResult objects with matching documents and similarity scores
+            
+        Raises:
+            Exception: If query processing fails with detailed error information
+        """
+        from .errors import handle_exception, log_error, RAGError, to_error_response
+        
+        correlation_id = str(uuid.uuid4())
+        
+        with logfire.span(
+            "query_documents",
+            query=input_data.query[:100],  # Truncate for logging
+            max_results=input_data.max_results,
+            score_threshold=input_data.score_threshold,
+            correlation_id=correlation_id
+        ):
             try:
-                # TODO: Implement actual query logic in later tasks
-                # This is a placeholder that will be replaced when orchestrator is implemented
-                logfire.info(f"Querying documents with: {input_data.query}")
-                return []
-            except Exception as e:
-                logfire.error(f"Error querying documents: {str(e)}")
-                raise
-    
-    @mcp.tool()
-    async def ingest_firestore_collection(input_data: IngestCollectionInput) -> IngestionStatus:
-        """Ingest documents from a Firestore collection into the vector database."""
-        with logfire.span("ingest_collection", collection=input_data.collection_name):
-            try:
-                # TODO: Implement actual ingestion logic in later tasks
-                # This is a placeholder that will be replaced when orchestrator is implemented
-                logfire.info(f"Ingesting collection: {input_data.collection_name}")
-                return IngestionStatus(
-                    status="success",
-                    collection_name=input_data.collection_name,
-                    documents_processed=0,
-                    chunks_created=0,
-                    embeddings_generated=0
+                logger.info(
+                    f"[{correlation_id}] Processing query: '{input_data.query[:50]}...' "
+                    f"(max_results={input_data.max_results})"
                 )
+                
+                # Execute query workflow through orchestrator
+                results = await orchestrator.query(
+                    query=input_data.query,
+                    max_results=input_data.max_results,
+                    score_threshold=input_data.score_threshold
+                )
+                
+                logger.info(f"[{correlation_id}] Query completed: {len(results)} results found")
+                
+                return results
+                
+            except RAGError as e:
+                # Handle structured RAG errors
+                log_error(e, context={'operation': 'query_documents', 'query': input_data.query[:100]})
+                error_response = to_error_response(e)
+                logfire.error(
+                    f"Query processing failed: {e.message}",
+                    correlation_id=e.correlation_id,
+                    error_code=e.code
+                )
+                
+                # Re-raise with structured error information
+                raise Exception(
+                    f"{error_response.error_code}: {error_response.error_message} "
+                    f"(correlation_id: {error_response.correlation_id})"
+                )
+                
             except Exception as e:
-                logfire.error(f"Error ingesting collection: {str(e)}")
-                raise
+                # Handle unexpected errors
+                error_response = handle_exception(e, "query_documents", correlation_id)
+                logfire.error(
+                    f"Unexpected error during query processing: {str(e)}",
+                    correlation_id=correlation_id
+                )
+                
+                # Re-raise with correlation ID for client error handling
+                raise Exception(
+                    f"{error_response.error_code}: {error_response.error_message} "
+                    f"(correlation_id: {correlation_id})"
+                )
     
     @mcp.tool()
     async def get_server_status() -> ServerStatus:
-        """Get the current status of the RAG MCP server and its components."""
-        with logfire.span("get_server_status"):
+        """
+        Get the current status of the RAG MCP server and its components.
+        
+        Returns health status for:
+        - Overall server status
+        - CSV parser component
+        - FastEmbed embedder component
+        - Qdrant vector database connection
+        - LangGraph orchestrator
+        
+        Returns:
+            ServerStatus with component health information
+        """
+        from .errors import handle_exception
+        
+        correlation_id = str(uuid.uuid4())
+        
+        with logfire.span("get_server_status", correlation_id=correlation_id):
             try:
-                logfire.info("Getting server status")
+                logger.info(f"[{correlation_id}] Getting server status")
+                
+                # Calculate uptime
+                uptime_seconds = None
+                if _server_start_time:
+                    uptime_seconds = (datetime.now(timezone.utc) - _server_start_time).total_seconds()
+                
+                # Get component health status
+                health_status = await orchestrator.health_check()
+                
+                # Map health check results to component status
+                components = {
+                    "csv_parser": health_status.get("csv_parser", "unknown"),
+                    "fastembed": health_status.get("embedder", "unknown"),
+                    "qdrant_client": health_status.get("qdrant", "unknown"),
+                    "langgraph": "ok"  # If orchestrator is running, LangGraph is ok
+                }
+                
+                # Determine overall status
+                if all(status == "ok" for status in components.values()):
+                    overall_status = "running"
+                elif any(status == "error" for status in components.values()):
+                    overall_status = "error"
+                else:
+                    overall_status = "running"  # Partial functionality
+                
+                logger.info(
+                    f"[{correlation_id}] Server status: {overall_status}, "
+                    f"components: {components}"
+                )
+                
                 return ServerStatus(
                     server_name=config.mcp_server_name,
                     version=config.mcp_version,
-                    status="running",
-                    components={
-                        "firestore_client": "not_initialized",
-                        "qdrant_client": "not_initialized", 
-                        "fastembed": "not_initialized",
-                        "langgraph": "not_initialized"
-                    }
+                    status=overall_status,
+                    uptime_seconds=uptime_seconds,
+                    components=components,
+                    last_health_check=datetime.now(timezone.utc)
                 )
+                
             except Exception as e:
-                logfire.error(f"Error getting server status: {str(e)}")
-                raise
+                # Handle errors gracefully and return error status
+                error_response = handle_exception(e, "get_server_status", correlation_id)
+                logger.error(
+                    f"[{correlation_id}] Error getting server status: {str(e)}",
+                    exc_info=True
+                )
+                logfire.error(
+                    f"Server status check failed: {error_response.error_message}",
+                    correlation_id=correlation_id
+                )
+                
+                # Return error status with available information
+                uptime_seconds = None
+                if _server_start_time:
+                    uptime_seconds = (datetime.now(timezone.utc) - _server_start_time).total_seconds()
+                
+                return ServerStatus(
+                    server_name=config.mcp_server_name,
+                    version=config.mcp_version,
+                    status="error",
+                    uptime_seconds=uptime_seconds,
+                    components={
+                        "csv_parser": "unknown",
+                        "fastembed": "unknown",
+                        "qdrant_client": "unknown",
+                        "langgraph": "unknown"
+                    },
+                    last_health_check=datetime.now(timezone.utc)
+                )
     
+    logger.info("FastMCP server created with tools: ingest_csv, query_documents, get_server_status")
     return mcp
 
 
 # Main application entry point
 def main():
     """Main application entry point."""
-    # Load configuration
-    config = ServerConfig()
-    
-    # Create MCP server
-    mcp_server = create_mcp_server(config)
-    
-    # Start the server (FastMCP handles the asyncio loop internally)
-    mcp_server.run()
+    try:
+        # Load configuration
+        config = ServerConfig()
+        
+        logger.info(f"Starting {config.mcp_server_name} v{config.mcp_version}")
+        logger.info(f"Configuration: CSV directory={config.csv_data_directory}, "
+                   f"Qdrant URL={config.qdrant_url}, "
+                   f"Embedding model={config.embedding_model_name}")
+        
+        # Create MCP server
+        mcp_server = create_mcp_server(config)
+        
+        # Start the server (FastMCP handles the asyncio loop internally)
+        logger.info("Starting FastMCP server...")
+        mcp_server.run()
+        
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":

@@ -8,11 +8,17 @@ This module provides:
 """
 
 from typing import List, Dict, Any, Optional
+import logging
+
+import logfire
 from fastembed import TextEmbedding
 from app.models import DocumentChunk, DocumentEmbedding
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import uuid
+
+
+logger = logging.getLogger(__name__)
 
 
 class TextChunker:
@@ -176,28 +182,48 @@ class Embedder:
         Returns:
             List of embedding vectors
         """
-        if not texts:
-            return []
-        
-        # Run FastEmbed in thread pool since it's synchronous
-        loop = asyncio.get_event_loop()
-        
-        # Process in batches for better performance
-        all_embeddings = []
-        
-        for i in range(0, len(texts), self.batch_size):
-            batch = texts[i:i + self.batch_size]
+        with logfire.span(
+            "embedder.embed_texts",
+            texts_count=len(texts),
+            batch_size=self.batch_size,
+            model_name=self.model_name
+        ):
+            if not texts:
+                return []
             
-            # Generate embeddings for batch
-            embeddings = await loop.run_in_executor(
-                self._executor,
-                self._generate_embeddings_sync,
-                batch
+            # Run FastEmbed in thread pool since it's synchronous
+            loop = asyncio.get_event_loop()
+            
+            # Process in batches for better performance
+            all_embeddings = []
+            num_batches = (len(texts) + self.batch_size - 1) // self.batch_size
+            
+            for i in range(0, len(texts), self.batch_size):
+                batch = texts[i:i + self.batch_size]
+                batch_num = i // self.batch_size + 1
+                
+                with logfire.span(
+                    "embedder.process_batch",
+                    batch_num=batch_num,
+                    total_batches=num_batches,
+                    batch_size=len(batch)
+                ):
+                    # Generate embeddings for batch
+                    embeddings = await loop.run_in_executor(
+                        self._executor,
+                        self._generate_embeddings_sync,
+                        batch
+                    )
+                    
+                    all_embeddings.extend(embeddings)
+                    logger.debug(f"Processed batch {batch_num}/{num_batches}")
+            
+            logfire.info(
+                "Embeddings generated",
+                total_embeddings=len(all_embeddings),
+                model=self.model_name
             )
-            
-            all_embeddings.extend(embeddings)
-        
-        return all_embeddings
+            return all_embeddings
     
     def _generate_embeddings_sync(self, texts: List[str]) -> List[List[float]]:
         """
@@ -280,7 +306,15 @@ class Embedder:
         Returns:
             List of DocumentChunk objects
         """
-        return self.chunker.chunk_text(text, parent_document_id, metadata)
+        with logfire.span(
+            "embedder.chunk_text",
+            text_length=len(text),
+            max_chunk_size=self.chunker.max_chunk_size,
+            chunk_overlap=self.chunker.chunk_overlap
+        ):
+            chunks = self.chunker.chunk_text(text, parent_document_id, metadata)
+            logfire.info("Text chunked", chunks_created=len(chunks))
+            return chunks
     
     async def chunk_and_embed(
         self,

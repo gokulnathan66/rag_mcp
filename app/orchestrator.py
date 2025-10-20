@@ -13,6 +13,7 @@ from typing import List, Dict, Any, Optional, TypedDict, Annotated
 from datetime import datetime
 import operator
 
+import logfire
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -702,21 +703,24 @@ class Orchestrator:
         Returns:
             Dictionary with component health status
         """
-        health_status = {
-            "csv_parser": "ok",
-            "embedder": "ok",
-            "qdrant": "unknown"
-        }
-        
-        try:
-            # Check Qdrant connection
-            qdrant_healthy = await self.qdrant_client.health_check()
-            health_status["qdrant"] = "ok" if qdrant_healthy else "error"
-        except Exception as e:
-            logger.error(f"Qdrant health check failed: {e}")
-            health_status["qdrant"] = "error"
-        
-        return health_status
+        with logfire.span("orchestrator.health_check"):
+            health_status = {
+                "csv_parser": "ok",
+                "embedder": "ok",
+                "qdrant": "unknown"
+            }
+            
+            try:
+                # Check Qdrant connection
+                qdrant_healthy = await self.qdrant_client.health_check()
+                health_status["qdrant"] = "ok" if qdrant_healthy else "error"
+            except Exception as e:
+                logger.error(f"Qdrant health check failed: {e}")
+                logfire.error("Qdrant health check failed in orchestrator", error=str(e))
+                health_status["qdrant"] = "error"
+            
+            logfire.info("Health check completed", health_status=health_status)
+            return health_status
     
     async def close(self):
         """Close all component connections."""

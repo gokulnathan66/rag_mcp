@@ -144,7 +144,7 @@ Example configuration model:
 
 ```python
 class ServerConfig(BaseModel):
-		mcp_server_name: str = "firestore-rag-server"
+		mcp_server_name: str = "rag-server"
 		mcp_version: str = "1.0.0"
 		firestore_project_id: str
 		firestore_credentials_path: str

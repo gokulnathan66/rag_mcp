@@ -9,6 +9,9 @@ This module provides:
 """
 
 from typing import List, Dict, Any, Optional
+import logging
+
+import logfire
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
@@ -21,7 +24,6 @@ from qdrant_client.models import (
     ScoredPoint
 )
 from app.models import QdrantPoint, QueryResult, DocumentEmbedding, DocumentChunk
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -229,29 +231,41 @@ class QdrantClient:
         Returns:
             Dictionary with operation status and count
         """
-        if len(chunks) != len(embeddings):
-            raise ValueError("Number of chunks must match number of embeddings")
-        
-        # Create QdrantPoint objects from chunks and embeddings
-        points = []
-        for chunk, embedding in zip(chunks, embeddings):
-            payload = {
-                "document_id": chunk.parent_document_id,
-                "chunk_id": chunk.chunk_id,
-                "content": chunk.content,
-                "chunk_index": chunk.chunk_index,
-                "embedding_model": embedding.model_name,
-                **chunk.metadata  # Include any additional metadata
-            }
+        with logfire.span(
+            "qdrant.upsert_embeddings",
+            chunks_count=len(chunks),
+            embeddings_count=len(embeddings),
+            collection=collection_name or self.collection_name
+        ):
+            if len(chunks) != len(embeddings):
+                raise ValueError("Number of chunks must match number of embeddings")
             
-            point = QdrantPoint(
-                id=chunk.chunk_id,
-                vector=embedding.vector,
-                payload=payload
+            # Create QdrantPoint objects from chunks and embeddings
+            points = []
+            for chunk, embedding in zip(chunks, embeddings):
+                payload = {
+                    "document_id": chunk.parent_document_id,
+                    "chunk_id": chunk.chunk_id,
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                    "embedding_model": embedding.model_name,
+                    **chunk.metadata  # Include any additional metadata
+                }
+                
+                point = QdrantPoint(
+                    id=chunk.chunk_id,
+                    vector=embedding.vector,
+                    payload=payload
+                )
+                points.append(point)
+            
+            result = await self.upsert_points(points, collection_name)
+            logfire.info(
+                "Embeddings upserted to Qdrant",
+                points_count=result.get("count", 0),
+                collection=result.get("collection")
             )
-            points.append(point)
-        
-        return await self.upsert_points(points, collection_name)
+            return result
     
     async def search(
         self,
@@ -276,41 +290,54 @@ class QdrantClient:
         """
         collection_name = collection_name or self.collection_name
         
-        try:
-            # Build filter if conditions provided
-            query_filter = None
-            if filter_conditions:
-                query_filter = self._build_filter(filter_conditions)
-            
-            # Perform similarity search
-            results = await self.client.search(
-                collection_name=collection_name,
-                query_vector=query_vector,
-                limit=top_k,
-                score_threshold=score_threshold,
-                query_filter=query_filter,
-                with_payload=True,
-                with_vectors=False  # Don't return vectors to save bandwidth
-            )
-            
-            # Convert results to dictionaries
-            search_results = []
-            for result in results:
-                search_results.append({
-                    "id": result.id,
-                    "score": result.score,
-                    "payload": result.payload
-                })
-            
-            logger.info(
-                f"Search returned {len(search_results)} results from '{collection_name}'"
-            )
-            
-            return search_results
-            
-        except Exception as e:
-            logger.error(f"Error searching collection '{collection_name}': {e}")
-            raise
+        with logfire.span(
+            "qdrant.search",
+            collection=collection_name,
+            top_k=top_k,
+            score_threshold=score_threshold,
+            has_filters=filter_conditions is not None
+        ):
+            try:
+                # Build filter if conditions provided
+                query_filter = None
+                if filter_conditions:
+                    query_filter = self._build_filter(filter_conditions)
+                
+                # Perform similarity search
+                results = await self.client.search(
+                    collection_name=collection_name,
+                    query_vector=query_vector,
+                    limit=top_k,
+                    score_threshold=score_threshold,
+                    query_filter=query_filter,
+                    with_payload=True,
+                    with_vectors=False  # Don't return vectors to save bandwidth
+                )
+                
+                # Convert results to dictionaries
+                search_results = []
+                for result in results:
+                    search_results.append({
+                        "id": result.id,
+                        "score": result.score,
+                        "payload": result.payload
+                    })
+                
+                logger.info(
+                    f"Search returned {len(search_results)} results from '{collection_name}'"
+                )
+                logfire.info(
+                    "Qdrant search completed",
+                    results_count=len(search_results),
+                    collection=collection_name
+                )
+                
+                return search_results
+                
+            except Exception as e:
+                logger.error(f"Error searching collection '{collection_name}': {e}")
+                logfire.error("Qdrant search failed", collection=collection_name, error=str(e))
+                raise
     
     async def search_documents(
         self,
@@ -470,14 +497,17 @@ class QdrantClient:
         Returns:
             True if server is healthy, False otherwise
         """
-        try:
-            # Try to get collections as a health check
-            await self.client.get_collections()
-            logger.info("Qdrant health check passed")
-            return True
-        except Exception as e:
-            logger.error(f"Qdrant health check failed: {e}")
-            return False
+        with logfire.span("qdrant.health_check", url=self.url):
+            try:
+                # Try to get collections as a health check
+                await self.client.get_collections()
+                logger.info("Qdrant health check passed")
+                logfire.info("Qdrant health check passed", url=self.url)
+                return True
+            except Exception as e:
+                logger.error(f"Qdrant health check failed: {e}")
+                logfire.error("Qdrant health check failed", url=self.url, error=str(e))
+                return False
     
     async def close(self):
         """Close the Qdrant client connection."""
