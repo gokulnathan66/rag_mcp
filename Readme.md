@@ -166,6 +166,30 @@ class ServerConfig(BaseModel):
 
 Firestore listeners should implement callbacks for created, updated, and deleted documents. Sync state should be tracked in Qdrant payload metadata and use last-write-wins for conflict resolution.
 
+## Web UI
+
+A simple web interface is available for uploading CSV files and querying documents:
+
+```bash
+# Start Qdrant
+docker-compose up -d qdrant
+
+# Run web UI
+make web-ui
+# or
+python -m app.web_server
+```
+
+Open http://localhost:8000 in your browser.
+
+**Features:**
+- Upload CSV files through the browser
+- Query documents with natural language
+- View ingestion statistics and results
+- Monitor system health
+
+See [QUICKSTART_WEB_UI.md](QUICKSTART_WEB_UI.md) for detailed instructions.
+
 ## Next steps and suggestions
 
 - Implement skeleton FastMCP server with tools `query_documents`, `ingest_firestore_collection`, and `get_server_status`.

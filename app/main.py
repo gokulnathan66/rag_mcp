@@ -51,9 +51,10 @@ class QueryDocumentsInput(BaseModel):
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Minimum similarity score threshold")
 
 
-# Global orchestrator instance
+# Global orchestrator instance and lifecycle management
 _orchestrator: Optional[Orchestrator] = None
 _server_start_time: Optional[datetime] = None
+_shutdown_event: Optional[asyncio.Event] = None
 
 
 def get_orchestrator(config: ServerConfig) -> Orchestrator:
@@ -66,6 +67,92 @@ def get_orchestrator(config: ServerConfig) -> Orchestrator:
     return _orchestrator
 
 
+async def initialize_components(config: ServerConfig) -> Orchestrator:
+    """
+    Initialize all application components with proper startup sequence.
+    
+    This function ensures components are initialized in the correct order:
+    1. Orchestrator (which initializes CSV parser, embedder, and Qdrant client)
+    2. Qdrant collection setup
+    3. Health checks
+    
+    Args:
+        config: Server configuration
+        
+    Returns:
+        Initialized Orchestrator instance
+        
+    Raises:
+        Exception: If component initialization fails
+    """
+    logger.info("Starting component initialization...")
+    
+    try:
+        # Initialize orchestrator (this creates all sub-components)
+        orchestrator = get_orchestrator(config)
+        
+        # Ensure Qdrant collection exists
+        logger.info(f"Ensuring Qdrant collection '{config.qdrant_collection_name}' exists...")
+        await orchestrator.qdrant_client.ensure_collection(
+            collection_name=config.qdrant_collection_name,
+            vector_size=384  # Default for all-MiniLM-L6-v2
+        )
+        logger.info("Qdrant collection ready")
+        
+        # Perform initial health check
+        logger.info("Performing initial health check...")
+        health_status = await orchestrator.health_check()
+        
+        # Log component status
+        for component, status in health_status.items():
+            if status == "ok":
+                logger.info(f"✓ {component}: healthy")
+            else:
+                logger.warning(f"✗ {component}: {status}")
+        
+        # Check if critical components are healthy
+        if health_status.get("qdrant") != "ok":
+            logger.error("Critical component Qdrant is not healthy!")
+            raise Exception("Qdrant connection failed during initialization")
+        
+        logger.info("All components initialized successfully")
+        return orchestrator
+        
+    except Exception as e:
+        logger.error(f"Component initialization failed: {str(e)}", exc_info=True)
+        raise
+
+
+async def shutdown_components(orchestrator: Optional[Orchestrator] = None):
+    """
+    Gracefully shutdown all application components.
+    
+    This function ensures proper cleanup of resources:
+    1. Close Qdrant client connections
+    2. Cleanup orchestrator resources
+    3. Shutdown thread pools and async tasks
+    
+    Args:
+        orchestrator: Optional orchestrator instance to shutdown
+    """
+    logger.info("Starting graceful shutdown...")
+    
+    try:
+        if orchestrator:
+            # Close orchestrator and all its components
+            await orchestrator.close()
+            logger.info("Orchestrator closed successfully")
+        
+        # Clear global state
+        global _orchestrator
+        _orchestrator = None
+        
+        logger.info("Shutdown completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
+
+
 # Initialize FastMCP server
 def create_mcp_server(config: ServerConfig) -> FastMCP:
     """
@@ -76,6 +163,7 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
     - Server discovery and capability advertisement
     - Structured error responses
     - Tool registration and metadata
+    - Proper lifecycle management with startup/shutdown hooks
     
     Args:
         config: Server configuration
@@ -83,8 +171,9 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
     Returns:
         Configured FastMCP server instance
     """
-    global _server_start_time
+    global _server_start_time, _shutdown_event
     _server_start_time = datetime.now(timezone.utc)
+    _shutdown_event = asyncio.Event()
     
     # Set up Logfire monitoring
     setup_logfire(config)
@@ -97,8 +186,13 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
     
     logger.info(f"Creating FastMCP server: {config.mcp_server_name} v{config.mcp_version}")
     
-    # Initialize orchestrator on server startup
-    orchestrator = get_orchestrator(config)
+    # Get orchestrator reference for tools
+    def get_orchestrator_safe() -> Orchestrator:
+        """Get orchestrator with safety check."""
+        orchestrator = get_orchestrator(config)
+        if orchestrator is None:
+            raise Exception("Orchestrator not initialized. Server may not have started properly.")
+        return orchestrator
     
     @mcp.tool()
     async def ingest_csv(input_data: IngestCSVInput) -> IngestionStatus:
@@ -131,6 +225,9 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
         ):
             try:
                 logger.info(f"[{correlation_id}] Starting CSV ingestion: {input_data.file_path}")
+                
+                # Get orchestrator instance
+                orchestrator = get_orchestrator_safe()
                 
                 # Execute ingestion workflow through orchestrator
                 result = await orchestrator.ingest_csv(input_data.file_path)
@@ -214,6 +311,9 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
                     f"(max_results={input_data.max_results})"
                 )
                 
+                # Get orchestrator instance
+                orchestrator = get_orchestrator_safe()
+                
                 # Execute query workflow through orchestrator
                 results = await orchestrator.query(
                     query=input_data.query,
@@ -283,8 +383,18 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
                 if _server_start_time:
                     uptime_seconds = (datetime.now(timezone.utc) - _server_start_time).total_seconds()
                 
-                # Get component health status
-                health_status = await orchestrator.health_check()
+                # Get orchestrator instance safely
+                try:
+                    orchestrator = get_orchestrator_safe()
+                    # Get component health status
+                    health_status = await orchestrator.health_check()
+                except Exception as e:
+                    logger.warning(f"Could not get orchestrator for health check: {e}")
+                    health_status = {
+                        "csv_parser": "unknown",
+                        "embedder": "unknown",
+                        "qdrant": "unknown"
+                    }
                 
                 # Map health check results to component status
                 components = {
@@ -351,28 +461,75 @@ def create_mcp_server(config: ServerConfig) -> FastMCP:
     return mcp
 
 
-# Main application entry point
+# Main application entry point with proper lifecycle management
 def main():
-    """Main application entry point."""
+    """
+    Main application entry point.
+    
+    This function:
+    1. Loads configuration from environment
+    2. Initializes all components in correct order
+    3. Creates and configures the FastMCP server
+    4. Starts the server and handles graceful shutdown
+    
+    The initialization happens synchronously before FastMCP.run() is called,
+    ensuring all components are ready before accepting requests.
+    """
+    orchestrator = None
+    
     try:
         # Load configuration
         config = ServerConfig()
         
+        logger.info("=" * 60)
         logger.info(f"Starting {config.mcp_server_name} v{config.mcp_version}")
-        logger.info(f"Configuration: CSV directory={config.csv_data_directory}, "
-                   f"Qdrant URL={config.qdrant_url}, "
-                   f"Embedding model={config.embedding_model_name}")
+        logger.info("=" * 60)
+        logger.info(f"Configuration:")
+        logger.info(f"  CSV directory: {config.csv_data_directory}")
+        logger.info(f"  Qdrant URL: {config.qdrant_url}")
+        logger.info(f"  Qdrant collection: {config.qdrant_collection_name}")
+        logger.info(f"  Embedding model: {config.embedding_model_name}")
+        logger.info(f"  Max chunk size: {config.max_chunk_size}")
+        logger.info(f"  Chunk overlap: {config.chunk_overlap}")
+        logger.info(f"  Logfire enabled: {config.enable_logfire}")
+        logger.info(f"  Log level: {config.log_level}")
+        logger.info("=" * 60)
+        
+        # Initialize all components using asyncio
+        logger.info("Initializing components...")
+        orchestrator = asyncio.run(initialize_components(config))
+        logger.info("✓ All components initialized successfully")
         
         # Create MCP server
+        logger.info("Creating FastMCP server...")
         mcp_server = create_mcp_server(config)
+        logger.info("✓ FastMCP server created")
         
         # Start the server (FastMCP handles the asyncio loop internally)
-        logger.info("Starting FastMCP server...")
+        logger.info("=" * 60)
+        logger.info("FastMCP server is ready to accept connections")
+        logger.info("=" * 60)
+        
+        # Run the server - this blocks until shutdown
+        # FastMCP.run() creates its own event loop
         mcp_server.run()
         
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt, shutting down...")
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         raise
+    finally:
+        # Ensure cleanup happens
+        if orchestrator:
+            logger.info("Cleaning up resources...")
+            try:
+                asyncio.run(shutdown_components(orchestrator))
+                logger.info("✓ Cleanup completed")
+            except Exception as e:
+                logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
+        
+        logger.info("Server shutdown complete")
 
 
 if __name__ == "__main__":
