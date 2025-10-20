@@ -8,3 +8,4 @@ fastembed
 pydantic
 logfire
 langgraph
+pytest-asyncio

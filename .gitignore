@@ -5,3 +5,10 @@ __pycache__/
 .env
 .DS_Store
 qdrant_storage
+.logfire
+.pytest_cache
+
+
+
+#keys
+ren-web-456b74d7018f.json.json

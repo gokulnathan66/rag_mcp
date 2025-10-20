@@ -1,14 +1,20 @@
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Dict, Optional
 
 
 class ServerConfig(BaseSettings):
     """Server configuration with environment variable support."""
     
     # FastMCP Configuration
-    mcp_server_name: str = Field(default="firestore-rag-server", description="MCP server name")
+    mcp_server_name: str = Field(default="csv-rag-server", description="MCP server name")
     mcp_version: str = Field(default="1.0.0", description="MCP server version")
+    
+    # CSV Configuration
+    csv_data_directory: str = Field(default="./data", description="Directory containing CSV files")
+    csv_delimiter: str = Field(default=",", description="CSV delimiter character")
+    csv_encoding: str = Field(default="utf-8", description="CSV file encoding")
+    csv_column_mapping: Optional[Dict[str, str]] = Field(default=None, description="Optional column name mapping")
     
     # Firestore Configuration
     firestore_project_id: Optional[str] = Field(default=None, description="Google Cloud Firestore project ID")

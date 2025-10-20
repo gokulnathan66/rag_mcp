@@ -8,6 +8,7 @@ similarity search capabilities.
 
 from .config import ServerConfig
 from .models import (
+    CSVDocument,
     FirestoreDocument,
     DocumentChunk,
     DocumentEmbedding,
@@ -23,6 +24,7 @@ __author__ = "RAG MCP Server Team"
 
 __all__ = [
     "ServerConfig",
+    "CSVDocument",
     "FirestoreDocument", 
     "DocumentChunk",
     "DocumentEmbedding",

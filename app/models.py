@@ -4,6 +4,30 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import uuid
 
 
+class CSVDocument(BaseModel):
+    """Pydantic model for CSV document representation."""
+    document_id: str = Field(..., description="Unique document identifier")
+    source_file: str = Field(..., description="Path to the source CSV file")
+    row_number: int = Field(..., ge=1, description="Row number in the CSV file (1-indexed)")
+    content: Dict[str, Any] = Field(..., description="Document content as key-value pairs from CSV columns")
+    ingestion_time: datetime = Field(default_factory=datetime.utcnow, description="Document ingestion timestamp")
+    document_type: Optional[str] = Field(None, description="Optional document type classification")
+    
+    @field_validator('document_id')
+    @classmethod
+    def validate_document_id(cls, v):
+        if not v or not v.strip():
+            raise ValueError('document_id cannot be empty')
+        return v
+    
+    @field_validator('source_file')
+    @classmethod
+    def validate_source_file(cls, v):
+        if not v or not v.strip():
+            raise ValueError('source_file cannot be empty')
+        return v
+
+
 class FirestoreDocument(BaseModel):
     """Pydantic model for Firestore document representation."""
     document_id: str = Field(..., description="Unique document identifier from Firestore")
@@ -68,22 +92,23 @@ class QdrantPoint(BaseModel):
     @field_validator('payload')
     @classmethod
     def validate_payload(cls, v):
-        # Ensure required payload fields are present
-        required_fields = ['document_id', 'collection_path', 'content', 'chunk_index']
-        for field in required_fields:
-            if field not in v:
-                raise ValueError(f'payload must contain {field}')
+        # Ensure minimum required payload fields are present
+        # Only require document_id and content as minimum
+        if 'document_id' not in v:
+            raise ValueError('payload must contain document_id')
+        if 'content' not in v:
+            raise ValueError('payload must contain content')
         return v
 
 
 class QueryResult(BaseModel):
     """Pydantic model for query results returned to MCP clients."""
-    document_id: str = Field(..., description="ID of the source Firestore document")
+    document_id: str = Field(..., description="ID of the source document")
     chunk_id: str = Field(..., description="ID of the matching document chunk")
     content: str = Field(..., description="Text content of the matching chunk")
     similarity_score: float = Field(..., ge=0.0, le=1.0, description="Similarity score between 0 and 1")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
-    firestore_metadata: FirestoreDocument = Field(..., description="Original Firestore document metadata")
+    csv_metadata: CSVDocument = Field(..., description="Original CSV document metadata")
 
 
 class ErrorResponse(BaseModel):
