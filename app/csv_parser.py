@@ -219,18 +219,57 @@ class CSVParser:
                 # Continue processing other rows
                 continue
         
-            logger.info(
-                f"Successfully parsed {len(documents)} documents from {file_path} "
-                f"({len(rows) - len(documents)} rows skipped due to errors)"
-            )
-            logfire.info(
-                "CSV documents parsed",
-                documents_count=len(documents),
-                rows_skipped=len(rows) - len(documents),
-                file_path=file_path
-            )
+        logger.info(
+            f"Successfully parsed {len(documents)} documents from {file_path} "
+            f"({len(rows) - len(documents)} rows skipped due to errors)"
+        )
+        logfire.info(
+            "CSV documents parsed",
+            documents_count=len(documents),
+            rows_skipped=len(rows) - len(documents),
+            file_path=file_path
+        )
+        
+        return documents
+    
+    def row_to_text(self, row: Dict[str, Any]) -> str:
+        """
+        Convert a CSV row dictionary to a structured text representation.
+        
+        This method creates a human-readable text format that preserves
+        column-value relationships for better semantic embedding.
+        
+        Args:
+            row: Dictionary representing a CSV row
             
-            return documents
+        Returns:
+            Structured text representation of the row
+            
+        Example:
+            Input: {"Product": "Widget", "Price": "$10.99", "Stock": "50"}
+            Output: "Product: Widget, Price: $10.99, Stock: 50"
+        """
+        if not row:
+            return ""
+        
+        # Convert row to "Column: Value" pairs
+        parts = []
+        for column, value in row.items():
+            # Skip empty values
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            
+            # Clean and format the value
+            value_str = str(value).strip()
+            
+            # Escape special characters if needed
+            if ',' in value_str or ':' in value_str:
+                value_str = f'"{value_str}"'
+            
+            parts.append(f"{column}: {value_str}")
+        
+        # Join all parts with comma separator
+        return ", ".join(parts)
     
     def _generate_document_id(
         self,

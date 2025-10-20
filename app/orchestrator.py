@@ -174,18 +174,18 @@ class CSVIngestionWorkflow:
     
     async def _chunk_documents_node(self, state: IngestionState) -> IngestionState:
         """
-        Node 2: Chunk documents into smaller segments.
+        Node 2: Process CSV rows as semantic units.
         
         Handles:
-        - Text extraction from document content
-        - Chunking with overlap
+        - Row-to-text conversion using CSV parser
+        - Row-wise chunking (each row = one chunk)
         - Metadata preservation
         """
-        logger.info(f"Chunking {len(state['documents'])} documents")
+        logger.info(f"Processing {len(state['documents'])} CSV rows as semantic units")
         
         # Check if parsing was successful
         if state.get("status") == "parsing_failed" or not state.get("documents"):
-            logger.warning("Skipping chunking due to parsing failure")
+            logger.warning("Skipping row processing due to parsing failure")
             return {
                 **state,
                 "chunks": [],
@@ -197,31 +197,29 @@ class CSVIngestionWorkflow:
             all_chunks = []
             
             for document in state["documents"]:
-                # Convert document content to text for chunking
-                # Concatenate all field values with field names
-                text_parts = []
-                for key, value in document.content.items():
-                    text_parts.append(f"{key}: {value}")
-                
-                document_text = "\n".join(text_parts)
+                # Convert CSV row to structured text representation
+                # This preserves column-value relationships
+                document_text = self.csv_parser.row_to_text(document.content)
                 
                 # Create metadata for chunks
                 chunk_metadata = {
                     "source_file": document.source_file,
                     "row_number": document.row_number,
-                    "ingestion_time": document.ingestion_time.isoformat()
+                    "ingestion_time": document.ingestion_time.isoformat(),
+                    "document_type": "csv_row"
                 }
                 
-                # Chunk the document text
+                # Use row-wise chunking strategy (each row = one chunk)
                 chunks = self.embedder.chunk_text(
                     text=document_text,
                     parent_document_id=document.document_id,
-                    metadata=chunk_metadata
+                    metadata=chunk_metadata,
+                    chunking_strategy="row"
                 )
                 
                 all_chunks.extend(chunks)
             
-            logger.info(f"Created {len(all_chunks)} chunks from documents")
+            logger.info(f"Created {len(all_chunks)} chunks from {len(state['documents'])} CSV rows (1:1 mapping)")
             
             return {
                 **state,
@@ -231,13 +229,13 @@ class CSVIngestionWorkflow:
             }
             
         except Exception as e:
-            logger.error(f"Error during document chunking: {str(e)}")
+            logger.error(f"Error during row processing: {str(e)}")
             return {
                 **state,
                 "chunks": [],
                 "chunks_created": 0,
                 "status": "chunking_failed",
-                "errors": [f"Chunking error: {str(e)}"]
+                "errors": [f"Row processing error: {str(e)}"]
             }
     
     async def _generate_embeddings_node(self, state: IngestionState) -> IngestionState:

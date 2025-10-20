@@ -293,7 +293,8 @@ class Embedder:
         self,
         text: str,
         parent_document_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        chunking_strategy: str = "character"
     ) -> List[DocumentChunk]:
         """
         Chunk text into smaller segments with overlap.
@@ -302,6 +303,9 @@ class Embedder:
             text: Text to chunk
             parent_document_id: ID of the parent document
             metadata: Additional metadata for chunks
+            chunking_strategy: Strategy to use ("character" or "row")
+                - "character": Split text by character count with overlap
+                - "row": Treat entire text as single semantic unit (for CSV rows)
             
         Returns:
             List of DocumentChunk objects
@@ -310,17 +314,32 @@ class Embedder:
             "embedder.chunk_text",
             text_length=len(text),
             max_chunk_size=self.chunker.max_chunk_size,
-            chunk_overlap=self.chunker.chunk_overlap
+            chunk_overlap=self.chunker.chunk_overlap,
+            chunking_strategy=chunking_strategy
         ):
-            chunks = self.chunker.chunk_text(text, parent_document_id, metadata)
-            logfire.info("Text chunked", chunks_created=len(chunks))
-            return chunks
+            if chunking_strategy == "row":
+                # Row-wise chunking: treat entire text as single unit
+                chunk = DocumentChunk(
+                    chunk_id=str(uuid.uuid4()),
+                    parent_document_id=parent_document_id,
+                    content=text,
+                    chunk_index=0,
+                    metadata={**(metadata or {}), "chunking_strategy": "row"}
+                )
+                logfire.info("Row-wise chunking applied", chunks_created=1)
+                return [chunk]
+            else:
+                # Character-based chunking with overlap
+                chunks = self.chunker.chunk_text(text, parent_document_id, metadata)
+                logfire.info("Text chunked", chunks_created=len(chunks))
+                return chunks
     
     async def chunk_and_embed(
         self,
         text: str,
         parent_document_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        chunking_strategy: str = "character"
     ) -> tuple[List[DocumentChunk], List[DocumentEmbedding]]:
         """
         Convenience method to chunk text and generate embeddings in one call.
@@ -329,12 +348,13 @@ class Embedder:
             text: Text to chunk and embed
             parent_document_id: ID of the parent document
             metadata: Additional metadata for chunks
+            chunking_strategy: Strategy to use ("character" or "row")
             
         Returns:
             Tuple of (chunks, embeddings)
         """
         # Chunk the text
-        chunks = self.chunk_text(text, parent_document_id, metadata)
+        chunks = self.chunk_text(text, parent_document_id, metadata, chunking_strategy)
         
         # Generate embeddings for chunks
         embeddings = await self.embed_documents(chunks)
