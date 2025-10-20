@@ -1,1 +1,6 @@
 .kiro
+poetry.lock
+__pycache__/
+*.pyc
+.env
+.DS_Store
