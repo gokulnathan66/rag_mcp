@@ -4,10 +4,10 @@
       "command": "python",
       "args": [
         "-c",
-        "import requests; import json; import sys; response = requests.post('http://localhost:8000/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
+        "import requests; import json; import sys; response = requests.post('http://localhost:8080/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
       ],
       "env": {
-        "MCP_SERVER_URL": "http://localhost:8000/mcp/"
+        "MCP_SERVER_URL": "http://localhost:8080/mcp/"
       }
     }
   }

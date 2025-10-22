@@ -109,7 +109,7 @@ Use this checklist to get your RAG MCP Server Web UI up and running.
 
 - [ ] Check server logs for "Starting web server" message
 
-- [ ] Open browser to http://localhost:8000
+- [ ] Open browser to http://localhost:8080
 
 - [ ] Verify page loads with "RAG MCP Server" title
 
@@ -256,10 +256,10 @@ If you prefer to run everything in Docker:
 
 ### If Web UI won't start:
 
-- [ ] Check if port 8000 is already in use
+- [ ] Check if port 8080 is already in use
   ```bash
-  lsof -i :8000  # Mac/Linux
-  netstat -ano | findstr :8000  # Windows
+  lsof -i :8080  # Mac/Linux
+  netstat -ano | findstr :8080  # Windows
   ```
 
 - [ ] Use different port
@@ -343,7 +343,7 @@ docker-compose up -d qdrant
 python -m app.web_server
 
 # Check health
-curl http://localhost:8000/api/health
+curl http://localhost:8080/api/health
 
 # View logs
 docker-compose logs -f
@@ -354,9 +354,9 @@ docker-compose down
 
 ### URLs to Bookmark
 
-- Web UI: http://localhost:8000
+- Web UI: http://localhost:8080
 - Qdrant Dashboard: http://localhost:6333/dashboard
-- API Health: http://localhost:8000/api/health
+- API Health: http://localhost:8080/api/health
 
 ### Support
 

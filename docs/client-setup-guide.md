@@ -24,7 +24,7 @@ TRANSPORT_MODE=http                    # Enable HTTP transport (default: "defaul
 
 # HTTP Server Settings
 HTTP_HOST=127.0.0.1                   # Server host (default: "127.0.0.1")
-HTTP_PORT=8000                        # Server port (default: 8000)
+HTTP_PORT=8080                        # Server port (default: 8080)
 
 # Connection Management
 MAX_CONCURRENT_CONNECTIONS=100        # Max concurrent connections (default: 100)
@@ -51,7 +51,7 @@ config = ServerConfig(
     http_transport=HTTPTransportConfig(
         enable_http_transport=True,
         http_host="0.0.0.0",  # Bind to all interfaces
-        http_port=8000,
+        http_port=8080,
         max_concurrent_connections=100,
         connection_timeout=300,
         request_timeout=60,
@@ -71,7 +71,7 @@ config = ServerConfig(
 # Set environment variables
 export TRANSPORT_MODE=http
 export HTTP_HOST=0.0.0.0
-export HTTP_PORT=8000
+export HTTP_PORT=8080
 
 # Start the server
 python -m app.main
@@ -92,11 +92,11 @@ services:
   rag-mcp-server:
     build: .
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
       - TRANSPORT_MODE=http
       - HTTP_HOST=0.0.0.0
-      - HTTP_PORT=8000
+      - HTTP_PORT=8080
       - CSV_DATA_DIRECTORY=/app/data
       - QDRANT_URL=http://qdrant:6333
     volumes:
@@ -115,7 +115,7 @@ import os
 # Set configuration
 os.environ['TRANSPORT_MODE'] = 'http'
 os.environ['HTTP_HOST'] = '0.0.0.0'
-os.environ['HTTP_PORT'] = '8000'
+os.environ['HTTP_PORT'] = '8080'
 
 # Start server
 main()
@@ -146,10 +146,10 @@ Add the following configuration to your `mcp.json`:
       "command": "python",
       "args": [
         "-c",
-        "import requests; import json; import sys; response = requests.post('http://localhost:8000/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
+        "import requests; import json; import sys; response = requests.post('http://localhost:8080/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
       ],
       "env": {
-        "MCP_SERVER_URL": "http://localhost:8000/mcp/"
+        "MCP_SERVER_URL": "http://localhost:8080/mcp/"
       }
     }
   }
@@ -189,7 +189,7 @@ import json
 from typing import Dict, Any, Optional
 
 class RAGMCPClient:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8080"):
         self.base_url = base_url.rstrip('/')
         self.mcp_url = f"{self.base_url}/mcp/"
         self.health_url = f"{self.base_url}/health"
@@ -245,7 +245,7 @@ class RAGMCPClient:
 
 # Usage
 if __name__ == "__main__":
-    client = RAGMCPClient("http://localhost:8000")
+    client = RAGMCPClient("http://localhost:8080")
     
     # Test connection
     try:
@@ -279,7 +279,7 @@ Create `mcp-client.js`:
 const axios = require('axios');
 
 class RAGMCPClient {
-    constructor(baseUrl = 'http://localhost:8000') {
+    constructor(baseUrl = 'http://localhost:8080') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.mcpUrl = `${this.baseUrl}/mcp/`;
         this.healthUrl = `${this.baseUrl}/health`;
@@ -363,7 +363,7 @@ node mcp-client.js
 
 Test server status:
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -378,7 +378,7 @@ curl -X POST http://localhost:8000/mcp/ \
 
 Test health endpoint:
 ```bash
-curl -X GET http://localhost:8000/health
+curl -X GET http://localhost:8080/health
 ```
 
 #### Scripted curl Client
@@ -389,8 +389,8 @@ Create `curl-client.sh`:
 #!/bin/bash
 
 # Configuration
-MCP_URL="${MCP_SERVER_URL:-http://localhost:8000/mcp/}"
-HEALTH_URL="${MCP_HEALTH_URL:-http://localhost:8000/health}"
+MCP_URL="${MCP_SERVER_URL:-http://localhost:8080/mcp/}"
+HEALTH_URL="${MCP_HEALTH_URL:-http://localhost:8080/health}"
 TIMEOUT=30
 
 # Function to make MCP requests
@@ -491,7 +491,7 @@ chmod +x curl-client.sh
 Test the health endpoint:
 
 ```bash
-curl -X GET http://localhost:8000/health
+curl -X GET http://localhost:8080/health
 ```
 
 Expected response:
@@ -511,7 +511,7 @@ Expected response:
   "http_transport": {
     "transport_mode": "http",
     "host": "0.0.0.0",
-    "port": 8000,
+    "port": 8080,
     "active_connections": 0,
     "connection_stats": {
       "total_connections": 5,
@@ -527,7 +527,7 @@ Expected response:
 Test the MCP endpoint:
 
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -584,7 +584,7 @@ Expected response:
 
 3. Verify port is not blocked:
    ```bash
-   netstat -tlnp | grep 8000
+   netstat -tlnp | grep 8080
    ```
 
 4. Check firewall settings:
@@ -610,7 +610,7 @@ Expected response:
 
 2. Check server performance:
    ```bash
-   curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8000/health
+   curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8080/health
    ```
 
 3. Monitor server resources:
@@ -627,7 +627,7 @@ Expected response:
 **Solutions:**
 1. Check component health:
    ```bash
-   curl http://localhost:8000/health | jq '.components'
+   curl http://localhost:8080/health | jq '.components'
    ```
 
 2. Verify Qdrant connection:
@@ -659,7 +659,7 @@ Expected response:
 
 2. Check available tools:
    ```bash
-   curl -X POST http://localhost:8000/mcp/ \
+   curl -X POST http://localhost:8080/mcp/ \
      -H "Content-Type: application/json" \
      -d '{
        "jsonrpc": "2.0",
@@ -688,7 +688,7 @@ Expected response:
         -H "Access-Control-Request-Method: POST" \
         -H "Access-Control-Request-Headers: Content-Type" \
         -X OPTIONS \
-        http://localhost:8000/mcp/
+        http://localhost:8080/mcp/
    ```
 
 ### Network Configuration Issues
@@ -713,7 +713,7 @@ export HTTP_HOST=192.168.1.100
 **Solutions:**
 1. Find process using port:
    ```bash
-   lsof -i :8000
+   lsof -i :8080
    ```
 
 2. Use different port:
@@ -746,7 +746,7 @@ export HTTP_HOST=192.168.1.100
 # Test response time
 curl -w "Total time: %{time_total}s\n" \
      -o /dev/null -s \
-     http://localhost:8000/health
+     http://localhost:8080/health
 
 # Monitor server resources
 htop
@@ -788,7 +788,7 @@ When authentication is implemented:
 3. Ensure proper header format:
    ```bash
    curl -H "Authorization: Bearer your-api-key" \
-        http://localhost:8000/mcp/
+        http://localhost:8080/mcp/
    ```
 
 #### 2. Token Validation Errors
@@ -808,7 +808,7 @@ For production deployments with load balancers:
 
 ```nginx
 upstream rag_mcp_servers {
-    server 127.0.0.1:8000;
+    server 127.0.0.1:8080;
     server 127.0.0.1:8001;
     server 127.0.0.1:8002;
 }
@@ -866,7 +866,7 @@ frontend rag_mcp_frontend
 backend rag_mcp_backend
     balance roundrobin
     option httpchk GET /health
-    server rag1 127.0.0.1:8000 check
+    server rag1 127.0.0.1:8080 check
     server rag2 127.0.0.1:8001 check
     server rag3 127.0.0.1:8002 check
 ```
@@ -905,7 +905,7 @@ server {
 scrape_configs:
   - job_name: 'rag-mcp-server'
     static_configs:
-      - targets: ['localhost:8000']
+      - targets: ['localhost:8080']
     metrics_path: '/metrics'
     scrape_interval: 15s
 ```
@@ -932,10 +932,10 @@ services:
 1. **Firewall Configuration:**
    ```bash
    # Allow only specific IPs
-   sudo ufw allow from 192.168.1.0/24 to any port 8000
+   sudo ufw allow from 192.168.1.0/24 to any port 8080
    
    # Block all other access
-   sudo ufw deny 8000
+   sudo ufw deny 8080
    ```
 
 2. **VPN Access:**

@@ -9,7 +9,7 @@ services:
       # Enable HTTP transport mode
       - TRANSPORT_MODE=http
       - HTTP_HOST=0.0.0.0
-      - HTTP_PORT=8000
+      - HTTP_PORT=8080
       - MAX_CONCURRENT_CONNECTIONS=100
       - CONNECTION_TIMEOUT=300
       - REQUEST_TIMEOUT=60
@@ -19,12 +19,12 @@ services:
       - HEALTH_CHECK_PATH=/health
     ports:
       # Ensure HTTP port is exposed
-      - "8000:8000"
+      - "8080:8080"
     labels:
       # Add labels for container orchestration
       - "traefik.enable=true"
       - "traefik.http.routers.rag-mcp.rule=Host(`rag-mcp.localhost`)"
-      - "traefik.http.services.rag-mcp.loadbalancer.server.port=8000"
+      - "traefik.http.services.rag-mcp.loadbalancer.server.port=8080"
       - "traefik.http.routers.rag-mcp.service=rag-mcp"
       # Health check configuration for load balancers
       - "healthcheck.enabled=true"

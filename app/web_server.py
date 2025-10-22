@@ -58,15 +58,15 @@ def main():
     app = create_web_api(orchestrator, config)
     
     # Run server
-    logger.info("Starting web server on http://0.0.0.0:8000")
-    logger.info("Open http://localhost:8000 in your browser")
+    logger.info("Starting web server on http://0.0.0.0:2332")
+    logger.info("Open http://localhost:2332 in your browser")
     logger.info("=" * 60)
     
     try:
         uvicorn.run(
             app,
             host="0.0.0.0",
-            port=8000,
+            port=2332,
             log_level="info"
         )
     except KeyboardInterrupt:

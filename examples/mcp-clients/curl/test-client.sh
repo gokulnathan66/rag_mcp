@@ -8,8 +8,8 @@
 set -e
 
 # Configuration
-MCP_URL="${MCP_SERVER_URL:-http://localhost:8000/mcp/}"
-HEALTH_URL="${MCP_HEALTH_URL:-http://localhost:8000/health}"
+MCP_URL="${MCP_SERVER_URL:-http://localhost:8080/mcp/}"
+HEALTH_URL="${MCP_HEALTH_URL:-http://localhost:8080/health}"
 TIMEOUT=30
 VERBOSE=${VERBOSE:-false}
 
@@ -324,8 +324,8 @@ usage() {
     echo "  help                           - Show this help"
     echo
     echo "Environment Variables:"
-    echo "  MCP_SERVER_URL    - MCP server URL (default: http://localhost:8000/mcp/)"
-    echo "  MCP_HEALTH_URL    - Health endpoint URL (default: http://localhost:8000/health)"
+    echo "  MCP_SERVER_URL    - MCP server URL (default: http://localhost:8080/mcp/)"
+    echo "  MCP_HEALTH_URL    - Health endpoint URL (default: http://localhost:8080/health)"
     echo "  VERBOSE           - Enable verbose output (default: false)"
     echo
     echo "Examples:"
@@ -335,7 +335,7 @@ usage() {
     echo "  $0 query \"What products are available?\" 5 0.7"
     echo "  $0 interactive"
     echo
-    echo "  MCP_SERVER_URL=http://remote-server:8000/mcp/ $0 test"
+    echo "  MCP_SERVER_URL=http://remote-server:8080/mcp/ $0 test"
     echo "  VERBOSE=true $0 status"
 }
 

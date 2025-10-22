@@ -21,7 +21,7 @@ uvicorn app.main:app --reload
 3. Health check:
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 ```
 
 Notes:

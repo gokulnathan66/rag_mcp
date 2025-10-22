@@ -127,7 +127,7 @@ services:
 	rag-mcp-server:
 		build: .
 		ports:
-			- "8000:8000"
+			- "8080:8080"
 		environment:
 			- FIRESTORE_PROJECT_ID=${FIRESTORE_PROJECT_ID}
 			- FIRESTORE_CREDENTIALS_PATH=/app/credentials.json
@@ -180,7 +180,7 @@ make web-ui
 python -m app.web_server
 ```
 
-Open http://localhost:8000 in your browser.
+Open http://localhost:8080 in your browser.
 
 **Features:**
 - Upload CSV files through the browser

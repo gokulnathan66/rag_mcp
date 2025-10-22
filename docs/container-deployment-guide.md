@@ -17,11 +17,11 @@ docker run -d \
 # HTTP transport mode
 docker run -d \
   --name rag-mcp-server \
-  -p 8000:8000 \
+  -p 8080:8080 \
   -v $(pwd)/data:/app/data:ro \
   -e TRANSPORT_MODE=http \
   -e HTTP_HOST=0.0.0.0 \
-  -e HTTP_PORT=8000 \
+  -e HTTP_PORT=8080 \
   -e QDRANT_URL=http://host.docker.internal:6333 \
   rag-mcp-server:latest
 ```
@@ -47,7 +47,7 @@ Create a `.env` file with your configuration:
 # Transport Configuration
 TRANSPORT_MODE=http
 HTTP_HOST=0.0.0.0
-HTTP_PORT=8000
+HTTP_PORT=8080
 MAX_CONCURRENT_CONNECTIONS=100
 CONNECTION_TIMEOUT=300
 REQUEST_TIMEOUT=60
@@ -146,7 +146,7 @@ The `docker-compose.http.yml` includes Traefik labels for automatic service disc
 labels:
   - "traefik.enable=true"
   - "traefik.http.routers.rag-mcp.rule=Host(`rag-mcp.localhost`)"
-  - "traefik.http.services.rag-mcp.loadbalancer.server.port=8000"
+  - "traefik.http.services.rag-mcp.loadbalancer.server.port=8080"
 ```
 
 ### NGINX Configuration
@@ -154,9 +154,9 @@ Example NGINX upstream configuration:
 
 ```nginx
 upstream rag_mcp_backend {
-    server rag-mcp-server-1:8000 max_fails=3 fail_timeout=30s;
-    server rag-mcp-server-2:8000 max_fails=3 fail_timeout=30s;
-    server rag-mcp-server-3:8000 max_fails=3 fail_timeout=30s;
+    server rag-mcp-server-1:8080 max_fails=3 fail_timeout=30s;
+    server rag-mcp-server-2:8080 max_fails=3 fail_timeout=30s;
+    server rag-mcp-server-3:8080 max_fails=3 fail_timeout=30s;
 }
 
 server {
@@ -217,8 +217,8 @@ LOG_LEVEL=INFO
 #### Port Already in Use
 ```bash
 # Check what's using the port
-lsof -i :8000
-netstat -tulpn | grep :8000
+lsof -i :8080
+netstat -tulpn | grep :8080
 
 # Change the port
 export HTTP_PORT=8001
@@ -234,7 +234,7 @@ docker logs rag-mcp-server 2>&1 | grep -i health
 docker exec rag-mcp-server python docker-healthcheck.py
 
 # Test HTTP health endpoint
-curl -f http://localhost:8000/health
+curl -f http://localhost:8080/health
 ```
 
 #### Container Won't Start

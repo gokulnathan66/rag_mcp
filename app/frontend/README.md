@@ -32,7 +32,7 @@ Run the web server separately from the MCP server:
 python -m app.web_server
 ```
 
-Then open http://localhost:8000 in your browser.
+Then open http://localhost:8080 in your browser.
 
 ### Option 2: With Docker Compose
 
@@ -40,7 +40,7 @@ Then open http://localhost:8000 in your browser.
 docker-compose up web-ui
 ```
 
-Access at http://localhost:8000
+Access at http://localhost:8080
 
 ## API Endpoints
 

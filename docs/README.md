@@ -35,13 +35,13 @@ This directory contains comprehensive documentation for the RAG MCP Server HTTP 
    ```bash
    export TRANSPORT_MODE=http
    export HTTP_HOST=0.0.0.0
-   export HTTP_PORT=8000
+   export HTTP_PORT=8080
    python -m app.main
    ```
 
 2. **Test the connection:**
    ```bash
-   curl http://localhost:8000/health
+   curl http://localhost:8080/health
    ```
 
 3. **Choose your client method:**
@@ -63,7 +63,7 @@ Get the current status of the server and its components.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -84,7 +84,7 @@ Ingest documents from a CSV file into the vector database.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -109,7 +109,7 @@ Query documents using natural language and vector similarity search.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -131,7 +131,7 @@ Get HTTP transport-specific health information.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -149,7 +149,7 @@ curl -X POST http://localhost:8000/mcp/ \
 The server also provides a direct HTTP health check endpoint:
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 ```
 
 This endpoint returns comprehensive health information including:
@@ -168,7 +168,7 @@ TRANSPORT_MODE=http                    # Enable HTTP transport
 
 # HTTP Server Settings
 HTTP_HOST=127.0.0.1                   # Server host
-HTTP_PORT=8000                        # Server port
+HTTP_PORT=8080                        # Server port
 
 # Connection Management
 MAX_CONCURRENT_CONNECTIONS=100        # Max concurrent connections
@@ -192,11 +192,11 @@ services:
   rag-mcp-server:
     build: .
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
       - TRANSPORT_MODE=http
       - HTTP_HOST=0.0.0.0
-      - HTTP_PORT=8000
+      - HTTP_PORT=8080
       - CSV_DATA_DIRECTORY=/app/data
       - QDRANT_URL=http://qdrant:6333
     volumes:

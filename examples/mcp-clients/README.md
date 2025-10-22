@@ -42,8 +42,8 @@ pip install requests
 python simple_client.py
 
 # Run specific commands
-python simple_client.py http://localhost:8000 test
-python simple_client.py http://localhost:8000 status
+python simple_client.py http://localhost:8080 test
+python simple_client.py http://localhost:8080 status
 ```
 
 ### 3. Node.js Client (`nodejs/`)
@@ -111,7 +111,7 @@ Ensure the server is running with HTTP transport:
 # Set environment variables
 export TRANSPORT_MODE=http
 export HTTP_HOST=0.0.0.0
-export HTTP_PORT=8000
+export HTTP_PORT=8080
 
 # Start server
 python -m app.main
@@ -132,7 +132,7 @@ node examples/mcp-clients/nodejs/simple-client.js test
 ./examples/mcp-clients/curl/test-client.sh test
 
 # Direct curl
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 ```
 
 ### 3. Try the Tools
@@ -147,7 +147,7 @@ python simple_client.py
 node simple-client.js status
 
 # curl
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -194,8 +194,8 @@ All clients support these environment variables:
 
 ```bash
 # Server connection
-export MCP_SERVER_URL="http://localhost:8000/mcp/"
-export MCP_HEALTH_URL="http://localhost:8000/health"
+export MCP_SERVER_URL="http://localhost:8080/mcp/"
+export MCP_HEALTH_URL="http://localhost:8080/health"
 
 # Request settings
 export MCP_TIMEOUT="30"
@@ -212,13 +212,13 @@ To connect to a remote server:
 
 ```bash
 # Python
-python simple_client.py http://remote-server:8000
+python simple_client.py http://remote-server:8080
 
 # Node.js
-node simple-client.js http://remote-server:8000 test
+node simple-client.js http://remote-server:8080 test
 
 # curl
-MCP_SERVER_URL=http://remote-server:8000/mcp/ ./test-client.sh test
+MCP_SERVER_URL=http://remote-server:8080/mcp/ ./test-client.sh test
 ```
 
 ## Client Comparison
@@ -240,13 +240,13 @@ MCP_SERVER_URL=http://remote-server:8000/mcp/ ./test-client.sh test
 #### 1. Connection Refused
 ```bash
 # Check if server is running
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 
 # Check server logs
 python -m app.main
 
 # Verify port
-netstat -tlnp | grep 8000
+netstat -tlnp | grep 8080
 ```
 
 #### 2. Module Not Found (Python)
@@ -307,10 +307,10 @@ Test network connectivity:
 ping localhost
 
 # Test port accessibility
-telnet localhost 8000
+telnet localhost 8080
 
 # Test HTTP response
-curl -v http://localhost:8000/health
+curl -v http://localhost:8080/health
 ```
 
 ## Development

@@ -1,11 +1,12 @@
-fastmcp
-fastapi
-uvicorn
+fastmcp>=0.1.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
 # google-cloud-firestore
 # aiofirestore
-qdrant-client[async]
-fastembed
-pydantic
-logfire
-langgraph
-pytest-asyncio
+qdrant-client[async]>=1.7.0
+fastembed>=0.2.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+logfire>=0.1.0
+langgraph>=0.1.0
+pytest-asyncio>=0.21.0

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 from typing import Dict, Optional, List, Literal
 import ipaddress
@@ -10,7 +10,7 @@ class HTTPTransportConfig(BaseModel):
     # HTTP Server Configuration
     enable_http_transport: bool = Field(default=False, description="Enable HTTP transport mode")
     http_host: str = Field(default="127.0.0.1", description="HTTP server host address")
-    http_port: int = Field(default=8000, ge=1024, le=65535, description="HTTP server port")
+    http_port: int = Field(default=8080, ge=1024, le=65535, description="HTTP server port")
     
     # Connection Management
     max_concurrent_connections: int = Field(default=100, ge=1, description="Maximum concurrent HTTP connections")
@@ -19,15 +19,16 @@ class HTTPTransportConfig(BaseModel):
     
     # CORS Configuration
     enable_cors: bool = Field(default=True, description="Enable CORS for web clients")
-    cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
-    cors_methods: List[str] = Field(default=["GET", "POST", "OPTIONS"], description="Allowed CORS methods")
-    cors_headers: List[str] = Field(default=["*"], description="Allowed CORS headers")
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"], description="Allowed CORS origins")
+    cors_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "OPTIONS"], description="Allowed CORS methods")
+    cors_headers: List[str] = Field(default_factory=lambda: ["*"], description="Allowed CORS headers")
     
     # Health Check Configuration
     enable_health_endpoint: bool = Field(default=True, description="Enable /health endpoint")
     health_check_path: str = Field(default="/health", description="Health check endpoint path")
     
-    @validator('http_host')
+    @field_validator('http_host')
+    @classmethod
     def validate_host(cls, v):
         """Validate HTTP host address."""
         if v in ['localhost', '0.0.0.0']:
@@ -38,14 +39,16 @@ class HTTPTransportConfig(BaseModel):
         except ValueError:
             raise ValueError(f"Invalid IP address: {v}")
     
-    @validator('health_check_path')
+    @field_validator('health_check_path')
+    @classmethod
     def validate_health_path(cls, v):
         """Validate health check path format."""
         if not v.startswith('/'):
             raise ValueError("Health check path must start with '/'")
         return v
     
-    @validator('cors_origins')
+    @field_validator('cors_origins')
+    @classmethod
     def validate_cors_origins(cls, v):
         """Validate CORS origins format."""
         if not v:
@@ -106,11 +109,13 @@ class ServerConfig(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        env_nested_delimiter="__"
+        env_nested_delimiter="__",
+        extra="forbid"  # Explicitly forbid extra fields
     )
     
-    @validator('transport_mode')
-    def validate_transport_mode(cls, v, values):
+    @field_validator('transport_mode')
+    @classmethod
+    def validate_transport_mode(cls, v):
         """Validate transport mode configuration."""
         return v
     

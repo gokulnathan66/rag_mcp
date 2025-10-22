@@ -354,7 +354,7 @@ spec:
       - name: web-ui
         image: rag-web-ui:latest
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
 ```
 
 ## Future Enhancements

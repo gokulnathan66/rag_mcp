@@ -19,7 +19,7 @@
 ┌───────────────▼─────────────────┬────────────────▼─────────────────┐
 │      FastAPI Web Server         │      FastMCP Server              │
 │      (app/web_server.py)        │      (app/main.py)               │
-│  Port: 8000                     │  Protocol: stdio                 │
+│  Port: 8080                     │  Protocol: stdio                 │
 └───────────────┬─────────────────┴────────────────┬─────────────────┘
                 │                                   │
                 └──────────────┬────────────────────┘
@@ -72,7 +72,7 @@
 python -m app.web_server
 ```
 
-**Access**: http://localhost:8000
+**Access**: http://localhost:8080
 
 **Features**:
 - Upload CSV files via browser
@@ -309,7 +309,7 @@ docker-compose up -d
 
 **Web UI**:
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:8080/api/health
 ```
 
 **MCP Server**:
@@ -382,7 +382,7 @@ docker-compose up -d qdrant
 
 ### 2. Upload and Query (Web UI)
 ```
-1. Open http://localhost:8000
+1. Open http://localhost:8080
 2. Upload CSV file
 3. Wait for ingestion to complete
 4. Enter query in search box
@@ -401,7 +401,7 @@ docker-compose up -d qdrant
 ```bash
 # Upload multiple files
 for file in data/*.csv; do
-    curl -X POST http://localhost:8000/api/upload-csv \
+    curl -X POST http://localhost:8080/api/upload-csv \
          -F "file=@$file"
 done
 ```

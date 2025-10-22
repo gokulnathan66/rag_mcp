@@ -7,8 +7,8 @@ This document provides example configurations for connecting MCP clients to the 
 The RAG MCP Server supports HTTP transport mode, allowing remote clients to connect over HTTP. This enables integration with MCP clients like Cursor IDE, custom applications, and command-line tools.
 
 **Server Endpoints:**
-- MCP Protocol: `http://localhost:8000/mcp/`
-- Health Check: `http://localhost:8000/health`
+- MCP Protocol: `http://localhost:8080/mcp/`
+- Health Check: `http://localhost:8080/health`
 
 ## Cursor IDE Integration
 
@@ -23,10 +23,10 @@ Create or update your `mcp.json` configuration file:
       "command": "python",
       "args": [
         "-c",
-        "import requests; import json; import sys; response = requests.post('http://localhost:8000/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
+        "import requests; import json; import sys; response = requests.post('http://localhost:8080/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
       ],
       "env": {
-        "MCP_SERVER_URL": "http://localhost:8000/mcp/"
+        "MCP_SERVER_URL": "http://localhost:8080/mcp/"
       }
     }
   }
@@ -42,10 +42,10 @@ Create or update your `mcp.json` configuration file:
       "command": "python",
       "args": [
         "-c",
-        "import requests; import json; import sys; import time; data = json.loads(sys.stdin.read()); max_retries = 3; for attempt in range(max_retries): try: response = requests.post('http://localhost:8000/mcp/', json=data, timeout=30); response.raise_for_status(); print(json.dumps(response.json())); break; except Exception as e: time.sleep(1); if attempt == max_retries - 1: print(json.dumps({'error': {'code': 'CONNECTION_ERROR', 'message': str(e)}})); sys.exit(1)"
+        "import requests; import json; import sys; import time; data = json.loads(sys.stdin.read()); max_retries = 3; for attempt in range(max_retries): try: response = requests.post('http://localhost:8080/mcp/', json=data, timeout=30); response.raise_for_status(); print(json.dumps(response.json())); break; except Exception as e: time.sleep(1); if attempt == max_retries - 1: print(json.dumps({'error': {'code': 'CONNECTION_ERROR', 'message': str(e)}})); sys.exit(1)"
       ],
       "env": {
-        "MCP_SERVER_URL": "http://localhost:8000/mcp/",
+        "MCP_SERVER_URL": "http://localhost:8080/mcp/",
         "MCP_TIMEOUT": "30",
         "MCP_MAX_RETRIES": "3"
       }
@@ -65,10 +65,10 @@ For connecting to a remote RAG MCP Server:
       "command": "python",
       "args": [
         "-c",
-        "import requests; import json; import sys; response = requests.post('http://your-server-host:8000/mcp/', json=json.loads(sys.stdin.read()), timeout=60); print(json.dumps(response.json()))"
+        "import requests; import json; import sys; response = requests.post('http://your-server-host:8080/mcp/', json=json.loads(sys.stdin.read()), timeout=60); print(json.dumps(response.json()))"
       ],
       "env": {
-        "MCP_SERVER_URL": "http://your-server-host:8000/mcp/",
+        "MCP_SERVER_URL": "http://your-server-host:8080/mcp/",
         "MCP_TIMEOUT": "60"
       }
     }
@@ -83,7 +83,7 @@ For connecting to a remote RAG MCP Server:
 Test the `get_server_status` tool:
 
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -101,7 +101,7 @@ curl -X POST http://localhost:8000/mcp/ \
 Ingest a CSV file:
 
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -121,7 +121,7 @@ curl -X POST http://localhost:8000/mcp/ \
 Query documents:
 
 ```bash
-curl -X POST http://localhost:8000/mcp/ \
+curl -X POST http://localhost:8080/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -143,7 +143,7 @@ curl -X POST http://localhost:8000/mcp/ \
 Check server health:
 
 ```bash
-curl -X GET http://localhost:8000/health
+curl -X GET http://localhost:8080/health
 ```
 
 ## Python Client Example
@@ -156,7 +156,7 @@ import json
 from typing import Dict, Any, Optional
 
 class RAGMCPClient:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8080"):
         self.base_url = base_url.rstrip('/')
         self.mcp_url = f"{self.base_url}/mcp/"
         self.health_url = f"{self.base_url}/health"
@@ -242,7 +242,7 @@ if __name__ == "__main__":
 const axios = require('axios');
 
 class RAGMCPClient {
-    constructor(baseUrl = 'http://localhost:8000') {
+    constructor(baseUrl = 'http://localhost:8080') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.mcpUrl = `${this.baseUrl}/mcp/`;
         this.healthUrl = `${this.baseUrl}/health`;
@@ -357,8 +357,8 @@ services:
         python scripts/test_mcp_client.py
       "
     environment:
-      - MCP_SERVER_URL=http://rag-mcp-server:8000/mcp/
-      - MCP_HEALTH_URL=http://rag-mcp-server:8000/health
+      - MCP_SERVER_URL=http://rag-mcp-server:8080/mcp/
+      - MCP_HEALTH_URL=http://rag-mcp-server:8080/health
     depends_on:
       - rag-mcp-server
     networks:
@@ -383,8 +383,8 @@ import time
 def test_mcp_connection():
     """Test MCP server connection and basic functionality."""
     
-    mcp_url = os.getenv('MCP_SERVER_URL', 'http://localhost:8000/mcp/')
-    health_url = os.getenv('MCP_HEALTH_URL', 'http://localhost:8000/health')
+    mcp_url = os.getenv('MCP_SERVER_URL', 'http://localhost:8080/mcp/')
+    health_url = os.getenv('MCP_HEALTH_URL', 'http://localhost:8080/health')
     
     print(f"Testing MCP server at: {mcp_url}")
     print(f"Health endpoint at: {health_url}")
@@ -450,8 +450,8 @@ if __name__ == "__main__":
 
 ```bash
 # Server connection
-export MCP_SERVER_URL="http://localhost:8000/mcp/"
-export MCP_HEALTH_URL="http://localhost:8000/health"
+export MCP_SERVER_URL="http://localhost:8080/mcp/"
+export MCP_HEALTH_URL="http://localhost:8080/health"
 
 # Request settings
 export MCP_TIMEOUT="30"
@@ -472,10 +472,10 @@ export MCP_AUTH_HEADER="Authorization"
       "command": "python",
       "args": [
         "-c",
-        "import os; import requests; import json; import sys; url = os.getenv('MCP_SERVER_URL', 'http://localhost:8000/mcp/'); timeout = int(os.getenv('MCP_TIMEOUT', '30')); response = requests.post(url, json=json.loads(sys.stdin.read()), timeout=timeout); print(json.dumps(response.json()))"
+        "import os; import requests; import json; import sys; url = os.getenv('MCP_SERVER_URL', 'http://localhost:8080/mcp/'); timeout = int(os.getenv('MCP_TIMEOUT', '30')); response = requests.post(url, json=json.loads(sys.stdin.read()), timeout=timeout); print(json.dumps(response.json()))"
       ],
       "env": {
-        "MCP_SERVER_URL": "${MCP_SERVER_URL:-http://localhost:8000/mcp/}",
+        "MCP_SERVER_URL": "${MCP_SERVER_URL:-http://localhost:8080/mcp/}",
         "MCP_TIMEOUT": "${MCP_TIMEOUT:-30}"
       }
     }

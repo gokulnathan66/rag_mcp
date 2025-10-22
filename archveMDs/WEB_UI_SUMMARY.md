@@ -168,17 +168,17 @@ LOG_LEVEL=INFO
 
 ```bash
 # Upload the sample CSV
-curl -X POST http://localhost:8000/api/upload-csv \
+curl -X POST http://localhost:8080/api/upload-csv \
   -F "file=@data/sample_products.csv"
 
 # Query documents
-curl -X POST http://localhost:8000/api/query \
+curl -X POST http://localhost:8080/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "wireless devices", "max_results": 5}'
 ```
 
 ### Or use the browser UI:
-1. Open http://localhost:8000
+1. Open http://localhost:8080
 2. Upload `data/sample_products.csv`
 3. Query: "wireless devices" or "office equipment"
 
@@ -190,7 +190,7 @@ curl -X POST http://localhost:8000/api/query \
 | Interface | CLI/Tool integration | Browser |
 | Input | File paths | File uploads |
 | Use Case | Automation/Integration | Human interaction |
-| Port | N/A (stdio) | 8000 (HTTP) |
+| Port | N/A (stdio) | 8080 (HTTP) |
 
 ## Security Notes
 
@@ -209,7 +209,7 @@ See `app/frontend/ARCHITECTURE.md` for detailed security recommendations.
 
 ## Troubleshooting
 
-### Port 8000 already in use
+### Port 8080 already in use
 ```bash
 # Use different port
 uvicorn app.web_api:app --host 0.0.0.0 --port 8080

@@ -16,7 +16,7 @@ class RAGMCPClient {
      * 
      * @param {string} baseUrl - Base URL of the RAG MCP Server
      */
-    constructor(baseUrl = 'http://localhost:8000') {
+    constructor(baseUrl = 'http://localhost:8080') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.mcpUrl = `${this.baseUrl}/mcp/`;
         this.healthUrl = `${this.baseUrl}/health`;
@@ -394,7 +394,7 @@ function showUsage() {
     console.log('  node simple-client.js ingest ./data/sample_products.csv');
     console.log('  node simple-client.js query "What products are available?" 5 0.7');
     console.log('  node simple-client.js interactive');
-    console.log('  node simple-client.js http://remote-server:8000 test');
+    console.log('  node simple-client.js http://remote-server:8080 test');
 }
 
 /**
@@ -413,7 +413,7 @@ async function main() {
     }
     
     // Parse arguments
-    let serverUrl = 'http://localhost:8000';
+    let serverUrl = 'http://localhost:8080';
     let command = 'interactive';
     let commandArgs = [];
     

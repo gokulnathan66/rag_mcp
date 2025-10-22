@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 class RAGMCPClient:
     """Simple MCP client for the RAG MCP Server."""
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8080"):
         """
         Initialize the MCP client.
         
@@ -172,7 +172,7 @@ def main():
     if len(sys.argv) > 1:
         server_url = sys.argv[1]
     else:
-        server_url = "http://localhost:8000"
+        server_url = "http://localhost:8080"
     
     print(f"Connecting to RAG MCP Server at: {server_url}")
     print("=" * 50)

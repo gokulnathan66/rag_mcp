@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   qdrant:
     image: qdrant/qdrant:v1.13.3
@@ -23,23 +21,23 @@ services:
       dockerfile: Dockerfile
     container_name: rag-mcp-server
     ports:
-      - "${HTTP_PORT:-8000}:8000"
+      - "${HTTP_PORT:-8080}:8080"
     environment:
       # FastMCP Configuration
       - MCP_SERVER_NAME=${MCP_SERVER_NAME:-csv-rag-server}
       - MCP_VERSION=${MCP_VERSION:-1.0.0}
       
       # Transport Configuration
-      - TRANSPORT_MODE=${TRANSPORT_MODE:-default}
-      - HTTP_HOST=${HTTP_HOST:-0.0.0.0}
-      - HTTP_PORT=${HTTP_PORT:-8000}
-      - MAX_CONCURRENT_CONNECTIONS=${MAX_CONCURRENT_CONNECTIONS:-100}
-      - CONNECTION_TIMEOUT=${CONNECTION_TIMEOUT:-300}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-60}
-      - ENABLE_CORS=${ENABLE_CORS:-true}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - ENABLE_HEALTH_ENDPOINT=${ENABLE_HEALTH_ENDPOINT:-true}
-      - HEALTH_CHECK_PATH=${HEALTH_CHECK_PATH:-/health}
+      - TRANSPORT_MODE=${TRANSPORT_MODE:-http}
+      - HTTP_TRANSPORT__ENABLE_HTTP_TRANSPORT=true
+      - HTTP_TRANSPORT__HTTP_HOST=${HTTP_HOST:-0.0.0.0}
+      - HTTP_TRANSPORT__HTTP_PORT=${HTTP_PORT:-8080}
+      - HTTP_TRANSPORT__MAX_CONCURRENT_CONNECTIONS=${MAX_CONCURRENT_CONNECTIONS:-100}
+      - HTTP_TRANSPORT__CONNECTION_TIMEOUT=${CONNECTION_TIMEOUT:-300}
+      - HTTP_TRANSPORT__REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-60}
+      - HTTP_TRANSPORT__ENABLE_CORS=${ENABLE_CORS:-true}
+      - HTTP_TRANSPORT__ENABLE_HEALTH_ENDPOINT=${ENABLE_HEALTH_ENDPOINT:-true}
+      - HTTP_TRANSPORT__HEALTH_CHECK_PATH=${HEALTH_CHECK_PATH:-/health}
       
       # CSV Configuration
       - CSV_DATA_DIRECTORY=/app/data
@@ -86,7 +84,7 @@ services:
       dockerfile: Dockerfile
     container_name: rag-web-ui
     ports:
-      - "8001:8000"
+      - "2332:2332"
     environment:
       # CSV Configuration
       - CSV_DATA_DIRECTORY=/app/data

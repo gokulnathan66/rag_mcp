@@ -2,180 +2,82 @@
 """
 Docker health check script for RAG MCP Server.
 
-This script provides a robust health check for containerized deployments,
-supporting both HTTP transport and default transport modes.
+This script performs a basic health check to ensure the server is running
+and responding correctly. It's used by Docker's HEALTHCHECK instruction.
 """
 
-import os
 import sys
-import json
-import urllib.request
-import urllib.error
-from typing import Dict, Any
+import os
+import asyncio
+import logging
+from pathlib import Path
+
+# Add the app directory to the Python path
+sys.path.insert(0, '/app')
+
+try:
+    from app.config import ServerConfig
+    from app.orchestrator import Orchestrator
+except ImportError as e:
+    print(f"Failed to import required modules: {e}")
+    sys.exit(1)
 
 
-def check_http_health(host: str, port: int, health_path: str, timeout: int = 5) -> Dict[str, Any]:
+async def check_health():
     """
-    Check HTTP transport health via the health endpoint.
-    
-    Args:
-        host: HTTP server host
-        port: HTTP server port  
-        health_path: Health check endpoint path
-        timeout: Request timeout in seconds
-        
-    Returns:
-        Health check result dictionary
-    """
-    try:
-        # Construct health check URL
-        if host == "0.0.0.0":
-            # Use localhost for health checks when binding to all interfaces
-            host = "127.0.0.1"
-        
-        url = f"http://{host}:{port}{health_path}"
-        
-        # Make health check request
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Docker-HealthCheck/1.0')
-        
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            if response.status == 200:
-                # Parse response body
-                try:
-                    health_data = json.loads(response.read().decode('utf-8'))
-                    return {
-                        "status": "healthy",
-                        "transport": "http",
-                        "url": url,
-                        "response_code": response.status,
-                        "health_data": health_data
-                    }
-                except json.JSONDecodeError:
-                    return {
-                        "status": "unhealthy",
-                        "transport": "http", 
-                        "url": url,
-                        "response_code": response.status,
-                        "error": "Invalid JSON response from health endpoint"
-                    }
-            else:
-                return {
-                    "status": "unhealthy",
-                    "transport": "http",
-                    "url": url,
-                    "response_code": response.status,
-                    "error": f"Health endpoint returned status {response.status}"
-                }
-                
-    except urllib.error.HTTPError as e:
-        return {
-            "status": "unhealthy",
-            "transport": "http",
-            "url": url,
-            "response_code": e.code,
-            "error": f"HTTP error: {e.code} {e.reason}"
-        }
-    except urllib.error.URLError as e:
-        return {
-            "status": "unhealthy", 
-            "transport": "http",
-            "url": url,
-            "error": f"Connection error: {str(e.reason)}"
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "transport": "http",
-            "url": url,
-            "error": f"Unexpected error: {str(e)}"
-        }
-
-
-def check_default_transport_health() -> Dict[str, Any]:
-    """
-    Check default transport (stdio) health by verifying process is running.
-    
-    For stdio transport, we can only do basic process health checks since
-    there's no network endpoint to query.
+    Perform health check on the RAG MCP Server.
     
     Returns:
-        Health check result dictionary
+        bool: True if healthy, False otherwise
     """
     try:
-        # Basic Python import test to verify the application can start
-        import app.main
-        return {
-            "status": "healthy",
-            "transport": "default",
-            "check_type": "process_health",
-            "message": "Application modules can be imported successfully"
-        }
-    except ImportError as e:
-        return {
-            "status": "unhealthy",
-            "transport": "default", 
-            "check_type": "process_health",
-            "error": f"Failed to import application: {str(e)}"
-        }
+        # Load configuration
+        config = ServerConfig()
+        
+        # Create orchestrator instance
+        orchestrator = Orchestrator(config)
+        
+        # Perform basic health check
+        health_status = await orchestrator.health_check()
+        
+        # Check if critical components are healthy
+        critical_components = ['qdrant']
+        for component in critical_components:
+            if health_status.get(component) != 'ok':
+                print(f"Health check failed: {component} is not healthy ({health_status.get(component)})")
+                return False
+        
+        print("Health check passed: All critical components are healthy")
+        return True
+        
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "transport": "default",
-            "check_type": "process_health", 
-            "error": f"Unexpected error during health check: {str(e)}"
-        }
+        print(f"Health check failed with exception: {str(e)}")
+        return False
+    finally:
+        # Clean up orchestrator if it was created
+        try:
+            if 'orchestrator' in locals():
+                await orchestrator.close()
+        except Exception as e:
+            print(f"Warning: Failed to close orchestrator during health check: {e}")
 
 
 def main():
-    """
-    Main health check function for Docker containers.
-    
-    This function determines the transport mode from environment variables
-    and performs the appropriate health check.
-    
-    Exit codes:
-        0: Healthy
-        1: Unhealthy
-    """
-    # Get configuration from environment variables
-    transport_mode = os.getenv("TRANSPORT_MODE", "default").lower()
-    
-    print(f"Docker health check starting (transport: {transport_mode})")
-    
-    if transport_mode == "http":
-        # HTTP transport health check
-        http_host = os.getenv("HTTP_HOST", "127.0.0.1")
-        http_port = int(os.getenv("HTTP_PORT", "8000"))
-        health_path = os.getenv("HEALTH_CHECK_PATH", "/health")
+    """Main entry point for health check."""
+    try:
+        # Run the async health check
+        is_healthy = asyncio.run(check_health())
         
-        print(f"Checking HTTP health at {http_host}:{http_port}{health_path}")
-        
-        result = check_http_health(http_host, http_port, health_path)
-        
-        print(f"Health check result: {json.dumps(result, indent=2)}")
-        
-        if result["status"] == "healthy":
-            print("✓ HTTP transport health check passed")
+        if is_healthy:
+            print("Docker health check: HEALTHY")
             sys.exit(0)
         else:
-            print("✗ HTTP transport health check failed")
+            print("Docker health check: UNHEALTHY")
             sys.exit(1)
             
-    else:
-        # Default transport (stdio) health check
-        print("Checking default transport health")
-        
-        result = check_default_transport_health()
-        
-        print(f"Health check result: {json.dumps(result, indent=2)}")
-        
-        if result["status"] == "healthy":
-            print("✓ Default transport health check passed")
-            sys.exit(0)
-        else:
-            print("✗ Default transport health check failed")
-            sys.exit(1)
+    except Exception as e:
+        print(f"Docker health check failed: {str(e)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

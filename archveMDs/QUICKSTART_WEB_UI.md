@@ -42,7 +42,7 @@ make web-ui
 python -m app.web_server
 ```
 
-Open your browser to: **http://localhost:8000**
+Open your browser to: **http://localhost:8080**
 
 ## Using the Web UI
 
@@ -169,7 +169,7 @@ LOG_LEVEL=INFO
 
 ### Port Already in Use
 
-If port 8000 is busy:
+If port 8080 is busy:
 ```bash
 # Use a different port
 uvicorn app.web_api:app --host 0.0.0.0 --port 8080
