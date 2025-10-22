@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "csv-rag-server-remote": {
+      "command": "python",
+      "args": [
+        "-c",
+        "import requests; import json; import sys; import time; data = json.loads(sys.stdin.read()); max_retries = 3; for attempt in range(max_retries): try: response = requests.post('http://your-server-host:8000/mcp/', json=data, timeout=30); response.raise_for_status(); print(json.dumps(response.json())); break; except Exception as e: time.sleep(1); if attempt == max_retries - 1: print(json.dumps({'error': {'code': 'CONNECTION_ERROR', 'message': str(e)}})); sys.exit(1)"
+      ],
+      "env": {
+        "MCP_SERVER_URL": "http://your-server-host:8000/mcp/",
+        "MCP_TIMEOUT": "30",
+        "MCP_MAX_RETRIES": "3"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "csv-rag-server": {
+      "command": "python",
+      "args": [
+        "-c",
+        "import requests; import json; import sys; response = requests.post('http://localhost:8000/mcp/', json=json.loads(sys.stdin.read())); print(json.dumps(response.json()))"
+      ],
+      "env": {
+        "MCP_SERVER_URL": "http://localhost:8000/mcp/"
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+# Docker Compose override for HTTP transport mode
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.http.yml up
+
+version: '3.8'
+
+services:
+  rag-mcp-server:
+    environment:
+      # Enable HTTP transport mode
+      - TRANSPORT_MODE=http
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=8000
+      - MAX_CONCURRENT_CONNECTIONS=100
+      - CONNECTION_TIMEOUT=300
+      - REQUEST_TIMEOUT=60
+      - ENABLE_CORS=true
+      - CORS_ORIGINS=*
+      - ENABLE_HEALTH_ENDPOINT=true
+      - HEALTH_CHECK_PATH=/health
+    ports:
+      # Ensure HTTP port is exposed
+      - "8000:8000"
+    labels:
+      # Add labels for container orchestration
+      - "traefik.enable=true"
+      - "traefik.http.routers.rag-mcp.rule=Host(`rag-mcp.localhost`)"
+      - "traefik.http.services.rag-mcp.loadbalancer.server.port=8000"
+      - "traefik.http.routers.rag-mcp.service=rag-mcp"
+      # Health check configuration for load balancers
+      - "healthcheck.enabled=true"
+      - "healthcheck.path=/health"
+      - "healthcheck.interval=30s"
+    healthcheck:
+      # More frequent health checks for HTTP mode
+      test: ["CMD", "python", "docker-healthcheck.py"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

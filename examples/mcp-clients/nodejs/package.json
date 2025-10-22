@@ -1,0 +1,22 @@
+{
+  "name": "rag-mcp-client",
+  "version": "1.0.0",
+  "description": "Node.js client for RAG MCP Server",
+  "main": "simple-client.js",
+  "scripts": {
+    "start": "node simple-client.js",
+    "test": "node simple-client.js test",
+    "interactive": "node simple-client.js interactive"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "keywords": [
+    "mcp",
+    "rag",
+    "client",
+    "http"
+  ],
+  "author": "RAG MCP Server Team",
+  "license": "MIT"
+}

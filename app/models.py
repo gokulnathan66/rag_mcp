@@ -139,3 +139,51 @@ class IngestionStatus(BaseModel):
     embeddings_generated: int = Field(..., ge=0, description="Number of embeddings generated")
     errors: List[str] = Field(default_factory=list, description="List of errors encountered during ingestion")
     processing_time_seconds: Optional[float] = Field(None, ge=0, description="Total processing time")
+
+
+class HTTPErrorResponse(BaseModel):
+    """Pydantic model for HTTP transport error responses."""
+    error_code: str = Field(..., description="Machine-readable error code")
+    error_message: str = Field(..., description="Human-readable error message")
+    http_status_code: int = Field(..., ge=100, le=599, description="HTTP status code")
+    error_details: Optional[Dict[str, Any]] = Field(None, description="Additional error context")
+    retry_after: Optional[int] = Field(None, ge=0, description="Seconds to wait before retrying")
+    correlation_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique error correlation ID")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    transport: Literal["http"] = Field(default="http", description="Transport type")
+    
+    @field_validator('http_status_code')
+    @classmethod
+    def validate_http_status_code(cls, v):
+        if not (100 <= v <= 599):
+            raise ValueError('HTTP status code must be between 100 and 599')
+        return v
+
+
+class HTTPRequestContext(BaseModel):
+    """Pydantic model for HTTP request context information."""
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique request identifier")
+    connection_id: Optional[str] = Field(None, description="HTTP connection identifier")
+    method: str = Field(..., description="HTTP request method")
+    path: str = Field(..., description="HTTP request path")
+    client_ip: Optional[str] = Field(None, description="Client IP address")
+    user_agent: Optional[str] = Field(None, description="Client user agent")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Request timestamp")
+    
+    @field_validator('method')
+    @classmethod
+    def validate_method(cls, v):
+        valid_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+        if v.upper() not in valid_methods:
+            raise ValueError(f'Invalid HTTP method: {v}')
+        return v.upper()
+
+
+class HTTPResponseContext(BaseModel):
+    """Pydantic model for HTTP response context information."""
+    request_id: str = Field(..., description="Associated request identifier")
+    status_code: int = Field(..., ge=100, le=599, description="HTTP response status code")
+    response_time_ms: Optional[float] = Field(None, ge=0, description="Response time in milliseconds")
+    content_length: Optional[int] = Field(None, ge=0, description="Response content length in bytes")
+    error: Optional[str] = Field(None, description="Error message if response failed")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
