@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Union
 import uuid
 
@@ -12,6 +12,11 @@ class CSVDocument(BaseModel):
     content: Dict[str, Any] = Field(..., description="Document content as key-value pairs from CSV columns")
     ingestion_time: datetime = Field(default_factory=datetime.utcnow, description="Document ingestion timestamp")
     document_type: Optional[str] = Field(None, description="Optional document type classification")
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat() + "Z" if v.tzinfo is None else v.isoformat()
+        }
     
     @field_validator('document_id')
     @classmethod
@@ -109,6 +114,11 @@ class QueryResult(BaseModel):
     similarity_score: float = Field(..., ge=0.0, le=1.0, description="Similarity score between 0 and 1")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
     csv_metadata: CSVDocument = Field(..., description="Original CSV document metadata")
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat() + "Z" if v.tzinfo is None else v.isoformat()
+        }
 
 
 class ErrorResponse(BaseModel):
