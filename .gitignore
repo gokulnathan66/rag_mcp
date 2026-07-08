@@ -17,3 +17,6 @@ data
 tests
 package-lock.json
 node_modules
+
+# Local knowledge and context
+claude.md
